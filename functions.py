@@ -109,10 +109,6 @@ def train_shared(args, gen_net: nn.Module, dis_net: nn.Module, g_loss_history, d
 
     return dynamic_reset
 
-# import sys
-# sys.path.insert('/home/kyle')
-
-# import transpose_conv_weight
 
 
 def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optimizer, gen_avg_param, train_loader,

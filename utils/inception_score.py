@@ -23,7 +23,6 @@ MODEL_DIR = '/tmp/imagenet'
 DATA_URL = 'http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz'
 softmax = None
 
-gpu_options = tf.GPUOptions(allow_growth=True)
 config = tf.ConfigProto()
 
 
