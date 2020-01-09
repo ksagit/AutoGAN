@@ -10,7 +10,10 @@ import sys
 import tarfile
 
 import numpy as np
-import tensorflow as tf
+# import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
+
 from six.moves import urllib
 from tqdm import tqdm
 
@@ -20,8 +23,8 @@ MODEL_DIR = '/tmp/imagenet'
 DATA_URL = 'http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz'
 softmax = None
 
+gpu_options = tf.GPUOptions(allow_growth=True)
 config = tf.ConfigProto()
-config.gpu_options.allow_growth = True
 
 
 # Call this function with list of images. Each of elements should be a
@@ -76,7 +79,7 @@ def _init_inception():
         statinfo = os.stat(filepath)
         print('Succesfully downloaded', filename, statinfo.st_size, 'bytes.')
     tarfile.open(filepath, 'r:gz').extractall(MODEL_DIR)
-    with tf.gfile.FastGFile(os.path.join(
+    with tf.io.gfile.GFile(os.path.join(
             MODEL_DIR, 'classify_image_graph_def.pb'), 'rb') as f:
         graph_def = tf.GraphDef()
         graph_def.ParseFromString(f.read())

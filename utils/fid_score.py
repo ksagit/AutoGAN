@@ -23,7 +23,10 @@ import pathlib
 import warnings
 
 import numpy as np
-import tensorflow as tf
+# import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
+
 from scipy import linalg
 from imageio import imread
 
@@ -37,7 +40,7 @@ class InvalidFIDException(Exception):
 def create_inception_graph(pth):
     """Creates a graph from saved GraphDef file."""
     # Creates graph from saved graph_def.pb.
-    with tf.gfile.FastGFile(pth, 'rb') as f:
+    with tf.io.gfile.GFile(pth, 'rb') as f:
         graph_def = tf.GraphDef()
         graph_def.ParseFromString(f.read())
         _ = tf.import_graph_def(graph_def, name='FID_Inception_Net')
