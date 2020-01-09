@@ -24,7 +24,7 @@ DATA_URL = 'http://download.tensorflow.org/models/image/imagenet/inception-2015-
 softmax = None
 
 config = tf.ConfigProto()
-
+config.gpu_options.allow_growth = True
 
 # Call this function with list of images. Each of elements should be a
 # numpy array with values ranging from 0 to 255.
@@ -57,6 +57,8 @@ def get_inception_score(images, splits=10):
             scores.append(np.exp(kl))
 
         sess.close()
+    tf.reset_default_graph()
+
     return np.mean(scores), np.std(scores)
 
 
