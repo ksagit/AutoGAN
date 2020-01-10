@@ -57,7 +57,6 @@ def get_inception_score(images, splits=10):
             scores.append(np.exp(kl))
 
         sess.close()
-    tf.reset_default_graph()
 
     return np.mean(scores), np.std(scores)
 
