@@ -110,7 +110,6 @@ def train_shared(args, gen_net: nn.Module, dis_net: nn.Module, g_loss_history, d
     return dynamic_reset
 
 
-
 def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optimizer, gen_avg_param, train_loader,
           epoch, writer_dict, schedulers=None):
     writer = writer_dict['writer']

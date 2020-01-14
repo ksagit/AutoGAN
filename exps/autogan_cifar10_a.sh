@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-python3 train.py \
+python train.py \
 -gen_bs 128 \
 -dis_bs 64 \
 --dataset cifar10 \

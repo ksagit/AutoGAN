@@ -10,10 +10,7 @@ import sys
 import tarfile
 
 import numpy as np
-# import tensorflow as tf
-import tensorflow.compat.v1 as tf
-tf.disable_v2_behavior()
-
+import tensorflow as tf
 from six.moves import urllib
 from tqdm import tqdm
 
@@ -25,6 +22,7 @@ softmax = None
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
+
 
 # Call this function with list of images. Each of elements should be a
 # numpy array with values ranging from 0 to 255.
@@ -57,7 +55,6 @@ def get_inception_score(images, splits=10):
             scores.append(np.exp(kl))
 
         sess.close()
-
     return np.mean(scores), np.std(scores)
 
 
@@ -79,7 +76,7 @@ def _init_inception():
         statinfo = os.stat(filepath)
         print('Succesfully downloaded', filename, statinfo.st_size, 'bytes.')
     tarfile.open(filepath, 'r:gz').extractall(MODEL_DIR)
-    with tf.io.gfile.GFile(os.path.join(
+    with tf.gfile.FastGFile(os.path.join(
             MODEL_DIR, 'classify_image_graph_def.pb'), 'rb') as f:
         graph_def = tf.GraphDef()
         graph_def.ParseFromString(f.read())
