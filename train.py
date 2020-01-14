@@ -143,6 +143,7 @@ def main():
             backup_param = copy_params(gen_net)
             load_params(gen_net, gen_avg_param)
             inception_score, fid_score = validate(args, fixed_z, fid_stat, gen_net, writer_dict)
+            torch.cuda.empty_cache()
             logger.info(f'Inception score: {inception_score}, FID score: {fid_score} || @ epoch {epoch}.')
             load_params(gen_net, backup_param)
             if fid_score < best_fid:
