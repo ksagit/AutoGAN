@@ -23,6 +23,8 @@ import torch.nn as nn
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 from copy import deepcopy
+import subprocess
+
 
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = True
@@ -125,6 +127,11 @@ def main():
         'train_global_steps': start_epoch * len(train_loader),
         'valid_global_steps': start_epoch // args.val_freq,
     }
+
+    # Version specific details
+    environment = subprocess.check_output(["conda", "list"]).decode()
+    revision = subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip().decode()
+    logger.info("Training with environment: {}\n\nModel revision: {}\n\n".format(environment, revision))
 
     # train loop
     for epoch in tqdm(range(int(start_epoch), int(args.max_epoch)), desc='total progress'):
