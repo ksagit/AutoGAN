@@ -35,23 +35,23 @@ class ImageDataset(object):
             self.train = torch.utils.data.DataLoader(
                 Dt(root=args.data_path, split='train+unlabeled', transform=transform, download=True),
                 batch_size=args.dis_batch_size, shuffle=True,
-                num_workers=args.num_workers, pin_memory=False)
+                num_workers=args.num_workers, pin_memory=True)
 
             self.valid = torch.utils.data.DataLoader(
                 Dt(root=args.data_path, split='test', transform=transform),
                 batch_size=args.dis_batch_size, shuffle=False,
-                num_workers=args.num_workers, pin_memory=False)
+                num_workers=args.num_workers, pin_memory=True)
 
             self.test = self.valid
         else:
             self.train = torch.utils.data.DataLoader(
                 Dt(root=args.data_path, train=True, transform=transform, download=True),
                 batch_size=args.dis_batch_size, shuffle=True,
-                num_workers=args.num_workers, pin_memory=False)
+                num_workers=args.num_workers, pin_memory=True)
 
             self.valid = torch.utils.data.DataLoader(
                 Dt(root=args.data_path, train=False, transform=transform),
                 batch_size=args.dis_batch_size, shuffle=False,
-                num_workers=args.num_workers, pin_memory=False)
+                num_workers=args.num_workers, pin_memory=True)
 
             self.test = self.valid
