@@ -24,7 +24,7 @@ from tensorboardX import SummaryWriter
 from tqdm import tqdm
 from copy import deepcopy
 import subprocess
-
+from models.neighbor_discriminator import NeighborDiscriminator
 
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = True
@@ -41,7 +41,7 @@ def main():
 
     # import network
     gen_net = eval('models.'+args.gen_model+'.Generator')(args=args).cuda()
-    dis_net = eval('models.'+args.dis_model+'.Discriminator')(args=args).cuda()
+    # dis_net = eval('models.'+args.dis_model+'.Discriminator')(args=args).cuda()
 
     # weight init
     def weights_init(m):
@@ -60,19 +60,21 @@ def main():
             nn.init.constant_(m.bias.data, 0.0)
 
     gen_net.apply(weights_init)
-    dis_net.apply(weights_init)
+    # dis_net.apply(weights_init)
 
     # set optimizer
     gen_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, gen_net.parameters()),
                                      args.g_lr, (args.beta1, args.beta2))
-    dis_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, dis_net.parameters()),
-                                     args.d_lr, (args.beta1, args.beta2))
+    # dis_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, dis_net.parameters()),
+    #                                 args.d_lr, (args.beta1, args.beta2))
     gen_scheduler = LinearLrDecay(gen_optimizer, args.g_lr, 0.0, 0, args.max_iter * args.n_critic)
-    dis_scheduler = LinearLrDecay(dis_optimizer, args.d_lr, 0.0, 0, args.max_iter * args.n_critic)
+    # dis_scheduler = LinearLrDecay(dis_optimizer, args.d_lr, 0.0, 0, args.max_iter * args.n_critic)
 
     # set up data_loader
     dataset = datasets.ImageDataset(args)
     train_loader = dataset.train
+
+    dis_net = NeighborDiscriminator()
 
     # fid stat
     if args.dataset.lower() == 'cifar10':
