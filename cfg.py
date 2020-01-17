@@ -19,9 +19,14 @@ def str2bool(v):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        '--K',
+        type=float,
+        default=1,
+        help='Lipschitz constant of the discriminator')
+    parser.add_argument(
         '--max_epoch',
         type=int,
-        default=200,
+        default=40,
         help='number of epochs of training')
     parser.add_argument(
         '--max_iter',

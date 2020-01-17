@@ -117,40 +117,31 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
 
     # train mode
     gen_net = gen_net.train()
-    dis_net = dis_net.train()
+    # dis_net = dis_net.train()
 
     for iter_idx, (imgs, _) in enumerate(tqdm(train_loader)):
         global_steps = writer_dict['train_global_steps']
 
-        # Adversarial ground truths
-        real_imgs = imgs.type(torch.cuda.FloatTensor)
-
         # Sample noise as generator input
-        z = torch.cuda.FloatTensor(np.random.normal(0, 1, (imgs.shape[0], args.latent_dim)))
+        z = torch.cuda.FloatTensor(np.random.normal(0, 1, (512, args.latent_dim)))
 
         # ---------------------
         #  Train Discriminator
         # ---------------------
         dis_optimizer.zero_grad()
 
-        real_validity = dis_net(real_imgs)
         fake_imgs = gen_net(z).detach()
-        assert fake_imgs.size() == real_imgs.size()
-
-        fake_validity = dis_net(fake_imgs)
-
-        # cal loss
-        d_loss = torch.mean(nn.ReLU(inplace=True)(1.0 - real_validity)) + \
-                 torch.mean(nn.ReLU(inplace=True)(1 + fake_validity))
-        d_loss.backward()
+        dis_loss = dis_net(fake_imgs).mean()
+        dis_loss.backward()
         dis_optimizer.step()
 
+        dis_net.adjust_weights()
         writer.add_scalar('d_loss', d_loss.item(), global_steps)
 
         # -----------------
         #  Train Generator
         # -----------------
-        if global_steps % args.n_critic == 0:
+        for i in range(5):
             gen_optimizer.zero_grad()
 
             gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.gen_batch_size, args.latent_dim)))
@@ -175,7 +166,6 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
                 avg_p.mul_(0.999).add_(0.001, p.data)
 
             writer.add_scalar('g_loss', g_loss.item(), global_steps)
-            gen_step += 1
 
         # verbose
         if gen_step and iter_idx % args.print_freq == 0:

@@ -65,8 +65,8 @@ def main():
     # set optimizer
     gen_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, gen_net.parameters()),
                                      args.g_lr, (args.beta1, args.beta2))
-    # dis_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, dis_net.parameters()),
-    #                                 args.d_lr, (args.beta1, args.beta2))
+    dis_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, dis_net.parameters()),
+                                    args.d_lr, (args.beta1, args.beta2))
     gen_scheduler = LinearLrDecay(gen_optimizer, args.g_lr, 0.0, 0, args.max_iter * args.n_critic)
     # dis_scheduler = LinearLrDecay(dis_optimizer, args.d_lr, 0.0, 0, args.max_iter * args.n_critic)
 
@@ -74,7 +74,7 @@ def main():
     dataset = datasets.ImageDataset(args)
     train_loader = dataset.train
 
-    dis_net = NeighborDiscriminator()
+    dis_net = NeighborDiscriminator(X=magic(dataset), K=args.K)
 
     # fid stat
     if args.dataset.lower() == 'cifar10':
