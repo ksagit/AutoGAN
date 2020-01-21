@@ -15,16 +15,16 @@ def torch_pairwise_distances(X, Y):
 class TestNeighborDiscriminator(unittest.TestCase):
 
     def setUp(self):
-        self.X = torch.randn(500, 3 * 32 * 32)
-        self.x_gen = torch.randn(2, 3 * 32 * 32)
+        self.X = torch.randn(5000, 3 * 32 * 32)
+        self.x_gen = torch.randn(128, 3 * 32 * 32)
         self.x_gen.requires_grad = True
-        self.dis = NeighborDiscriminator(self.X, k=5, K=10)
-        self.dis.w.data = torch.randn_like(self.dis.w.data)
+        self.dis = NeighborDiscriminator(self.X, k=20, K=1)
+        self.dis.w.data = torch.randn_like(self.dis.w.data) / 10
         self.dis.update_index()
 
 
     def test_neighbor_activation_correctness(self):
-        """For the baseline (exact) NeighborDiscriminator, we should have"""
+        """For the baseline (exact) NeighborDiscriminator, we should have exact matches"""
         maximal_neighbor_activations = self.dis(self.x_gen)[0]
 
         pairwise_distances = torch_pairwise_distances(self.X, self.x_gen)

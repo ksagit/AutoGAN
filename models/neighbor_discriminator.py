@@ -5,6 +5,9 @@ import numpy as np
 import faiss
 from torch.autograd import Function
 
+import logging
+
+logger = logging.getLogger(__name__)
 
 class NeighborDiscriminatorFunction(Function):
 
@@ -13,8 +16,8 @@ class NeighborDiscriminatorFunction(Function):
         D, I = model.get_approximated_neighbor_activations(input)
         D_actual, I_actual = model.get_actual_distances(D, I)
         D, I = model.get_maximal_neighbor_activations(D_actual, I_actual)
-        neighbors = model.X[I]
 
+        neighbors = model.X[I]
         D_actual_at_maxes_mask = torch.cat(
             [
                 (I_actual[:, col] == I).unsqueeze(1)
@@ -41,7 +44,6 @@ class NeighborDiscriminator(nn.Module):
             nlist: int = 100,
             nprobe: int = 10,
             k: int = 10,  # number of neighbors to check
-            steps: int = 1,
             eta: float = .1
 
     ):
@@ -61,7 +63,7 @@ class NeighborDiscriminator(nn.Module):
         self.update_index()
 
     def get_w_prime(self):
-        w_prime = -(self.w - torch.max(F.relu(self.w)))
+        w_prime = -(self.w - torch.max(self.w))
         w_prime = torch.sqrt(w_prime / self.K)
         return w_prime
 
@@ -86,10 +88,7 @@ class NeighborDiscriminator(nn.Module):
                 np.zeros((X_tilde.shape[0], 1))
             ]
         ).astype('float32')
-
-        index = self.index
-
-        D, I = index.search(X_tilde_padded, self.k)
+        D, I = self.index.search(X_tilde_padded, self.k)
         return D, I
 
     def get_actual_distances(self, D, I):
@@ -104,12 +103,12 @@ class NeighborDiscriminator(nn.Module):
 
     def get_maximal_neighbor_activations(self, D_actual, I):
         """Use the \|x_i - x\| to get the w_i - K \|x_i - x\|, and find the max and argmax over i"""
-        f_i_values = self.w[I].squeeze(2) - self.K * D_actual
-        minimal_distance_indices = torch.argmax(f_i_values, axis=1)
+        neighbor_activations = self.w[I].squeeze(2) - self.K * D_actual
+        maximal_neighbor_activation_indices = torch.argmax(neighbor_activations, axis=1)
         D_I = torch.Tensor(
             [
                 (dist_row[index], index_row[index])
-                for dist_row, index_row, index in zip(f_i_values, I, minimal_distance_indices)
+                for dist_row, index_row, index in zip(neighbor_activations, I, maximal_neighbor_activation_indices)
             ]
         )
         return D_I[:, 0], D_I[:, 1].long()
@@ -117,20 +116,24 @@ class NeighborDiscriminator(nn.Module):
     def forward(self, X_tilde):
         return NeighborDiscriminatorFunction.apply(X_tilde, self)
 
-    def train(self, X_tilde):
-        with torch.no_grad():
-            _, I = self(X_tilde)
-            counts = torch.zeros(self.n)
-            for label in I:
-                counts[label] += 1
+    def accum_grads(self, X_tilde):
+        _, I = self(X_tilde)
+        counts = torch.zeros(self.n)
+        for label in I:
+            counts[label] += 1
+        update_indices = torch.where(counts > 0)
+        self.w.grad = counts.unsqueeze(1)
+        return update_indices
 
-            update_indices = torch.where(counts > 0)
-            self.w -= counts.unsqueeze(1) * self.eta
+    def project_weights(self, update_indices):
+        with torch.no_grad():
+            self.update_index()
             self.w.data[update_indices] = self.forward(self.X[update_indices])[0].unsqueeze(1)
             self.w -= self.w.mean()
-
+            self.update_index()
 
 class QuantizedNeighborDiscriminator(NeighborDiscriminator):
+    """Doesn't work very well..."""
 
     def update_index(self):
         self.w_prime = self.get_w_prime()
