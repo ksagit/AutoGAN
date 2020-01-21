@@ -4,10 +4,17 @@ import torch
 import numpy as np
 import faiss
 from torch.autograd import Function
-
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def swig_ptr_from_FloatTensor(x: torch.Tensor):
+    assert x.is_contiguous()
+    assert x.dtype == torch.float32
+    return faiss.cast_integer_to_float_ptr(
+        x.storage().data_ptr() + x.storage_offset() * 4)
+
 
 class NeighborDiscriminatorFunction(Function):
 
@@ -68,33 +75,34 @@ class NeighborDiscriminator(nn.Module):
         return w_prime
 
     def get_X_w(self):
-        X = self.X.data.cpu().numpy()
-        w_prime = self.w_prime.data.cpu().numpy()
-        return np.hstack([X, w_prime]).astype('float32')
+        X = self.X.data
+        w_prime = self.w_prime
+        return torch.cat([X, w_prime], 1)
 
     def update_index(self):
         self.w_prime = self.get_w_prime()
         self.X_w = self.get_X_w()
-        index = faiss.IndexFlatL2(self.d + 1)
-        index.add(self.X_w)
+
+        gpu_resource = faiss.StandardGpuResources()
+        index = faiss.GpuIndexFlatL2(gpu_resource, self.d + 1)
+        index.add(self.X_w.data.numpy())
         self.index = index
 
     def get_approximated_neighbor_activations(self, X_tilde):
         """Get the nearest neighbors in \|x_i \oplus \sqrt{w_i'/K} - x \oplus 0\| """
         X_tilde = X_tilde.view(X_tilde.shape[0], -1)
-        X_tilde_padded = np.hstack(
+        X_tilde_padded = torch.cat(
             [
-                X_tilde.data.cpu().numpy(),
-                np.zeros((X_tilde.shape[0], 1))
-            ]
-        ).astype('float32')
-        D, I = self.index.search(X_tilde_padded, self.k)
-        return D, I
+                X_tilde,
+                torch.zeros((X_tilde.shape[0], 1))
+            ],
+            1
+        )
+        D, I = self.index.search(X_tilde_padded.data.numpy(), self.k)
+        return torch.from_numpy(D), torch.from_numpy(I)
 
     def get_actual_distances(self, D, I):
         """Adjust the approximated neighbor activations to get the \|x_i - x\|"""
-        D, I = torch.from_numpy(D), torch.from_numpy(I)
-
         local_w_adjustments = self.w_prime[I].squeeze(2)
         D_actual_squared = F.relu(D - local_w_adjustments ** 2)
 

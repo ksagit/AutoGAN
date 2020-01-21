@@ -25,10 +25,30 @@ from tqdm import tqdm
 from copy import deepcopy
 import subprocess
 from models.neighbor_discriminator import NeighborDiscriminator
+import torchvision.transforms as transforms
 
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = True
 
+DATA_PATH = "./data"
+
+def rip_cifar10_whole_tensor():
+    dataset = datasets.CIFAR10
+    transform = transforms.Compose([
+        transforms.Resize(32),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    ])
+
+    train = torch.utils.data.DataLoader(
+        dataset(
+            root=DATA_PATH, train=True, transform=transform, download=False
+        ),
+        batch_size=50000, shuffle=True,
+        num_workers=0, pin_memory=False
+    )
+    for imgs, _labels in train:
+        return imgs
 
 def main():
     args = cfg.parse_args()
@@ -42,6 +62,7 @@ def main():
     # import network
     gen_net = eval('models.'+args.gen_model+'.Generator')(args=args).cuda()
     # dis_net = eval('models.'+args.dis_model+'.Discriminator')(args=args).cuda()
+
 
     # weight init
     def weights_init(m):
@@ -61,7 +82,10 @@ def main():
 
     gen_net.apply(weights_init)
     # dis_net.apply(weights_init)
+    dataset = datasets.ImageDataset(args)
+    train_loader = dataset.train
 
+    dis_net = NeighborDiscriminator(X=rip_cifar10_whole_tensor().view(50000, -1), K=args.K)
     # set optimizer
     gen_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, gen_net.parameters()),
                                      args.g_lr, (args.beta1, args.beta2))
@@ -71,10 +95,7 @@ def main():
     # dis_scheduler = LinearLrDecay(dis_optimizer, args.d_lr, 0.0, 0, args.max_iter * args.n_critic)
 
     # set up data_loader
-    dataset = datasets.ImageDataset(args)
-    train_loader = dataset.train
 
-    dis_net = NeighborDiscriminator(X=magic(dataset), K=args.K)
 
     # fid stat
     if args.dataset.lower() == 'cifar10':

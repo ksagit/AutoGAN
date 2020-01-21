@@ -15,7 +15,7 @@ def torch_pairwise_distances(X, Y):
 class TestNeighborDiscriminator(unittest.TestCase):
 
     def setUp(self):
-        self.X = torch.randn(5000, 3 * 32 * 32)
+        self.X = torch.randn(50000, 3 * 32 * 32)
         self.x_gen = torch.randn(128, 3 * 32 * 32)
         self.x_gen.requires_grad = True
         self.dis = NeighborDiscriminator(self.X, k=20, K=1)

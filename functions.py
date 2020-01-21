@@ -15,6 +15,7 @@ import torch.nn as nn
 from imageio import imsave
 from torchvision.utils import make_grid
 from tqdm import tqdm
+from models.neighbor_discriminator import NeighborDiscriminator
 
 from utils.fid_score import calculate_fid_given_paths
 from utils.inception_score import get_inception_score
@@ -110,7 +111,7 @@ def train_shared(args, gen_net: nn.Module, dis_net: nn.Module, g_loss_history, d
     return dynamic_reset
 
 
-def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optimizer, gen_avg_param, train_loader,
+def train(args, gen_net: nn.Module, dis_net: NeighborDiscriminator, gen_optimizer, dis_optimizer, gen_avg_param, train_loader,
           epoch, writer_dict, schedulers=None):
     writer = writer_dict['writer']
     gen_step = 0
@@ -131,12 +132,12 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
         dis_optimizer.zero_grad()
 
         fake_imgs = gen_net(z).detach()
-        dis_loss = dis_net(fake_imgs).mean()
-        dis_loss.backward()
+        dis_net.accum_grads(fake_imgs)
         dis_optimizer.step()
+        dis_net.project_weights()
 
-        dis_net.adjust_weights()
-        writer.add_scalar('d_loss', d_loss.item(), global_steps)
+        # dis losses no longer informative
+        #  writer.add_scalar('d_loss', d_loss.item(), global_steps)
 
         # -----------------
         #  Train Generator
