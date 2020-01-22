@@ -129,12 +129,12 @@ def train(args, gen_net: nn.Module, dis_net: NeighborDiscriminator, gen_optimize
         # ---------------------
         #  Train Discriminator
         # ---------------------
-        dis_optimizer.zero_grad()
-
-        fake_imgs = gen_net(z).detach()
-        update_indices = dis_net.accum_grads(fake_imgs)
-        dis_optimizer.step()
-        dis_net.project_weights(update_indices)
+        # dis_optimizer.zero_grad()
+        #
+        # fake_imgs = gen_net(z).detach()
+        # update_indices = dis_net.accum_grads(fake_imgs)
+        # dis_optimizer.step()
+        # dis_net.project_weights(update_indices)
 
         # dis losses no longer informative
         #  writer.add_scalar('d_loss', d_loss.item(), global_steps)
@@ -142,7 +142,7 @@ def train(args, gen_net: nn.Module, dis_net: NeighborDiscriminator, gen_optimize
         # -----------------
         #  Train Generator
         # -----------------
-        for i in range(10):
+        for i in range(1):
             gen_optimizer.zero_grad()
 
             gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.gen_batch_size, args.latent_dim)))
@@ -169,10 +169,10 @@ def train(args, gen_net: nn.Module, dis_net: NeighborDiscriminator, gen_optimize
             writer.add_scalar('g_loss', g_loss.item(), global_steps)
 
         # verbose
-        if gen_step and iter_idx % args.print_freq == 0:
+        if iter_idx % args.print_freq == 0:
             tqdm.write(
-                "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]" %
-                (epoch, args.max_epoch, iter_idx % len(train_loader), len(train_loader), d_loss.item(), g_loss.item()))
+                "[Epoch %d/%d] [Batch %d/%d] [G loss: %f]" %
+                (epoch, args.max_epoch, iter_idx % len(train_loader), len(train_loader), g_loss.item()))
 
         writer_dict['train_global_steps'] = global_steps + 1
 
