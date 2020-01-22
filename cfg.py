@@ -107,7 +107,7 @@ def parse_args():
     parser.add_argument(
         '--print_freq',
         type=int,
-        default=100,
+        default=10,
         help='interval between each verbose')
     parser.add_argument(
         '--load_path',

@@ -24,7 +24,7 @@ class NeighborDiscriminatorFunction(Function):
         D_actual, I_actual = model.get_actual_distances(D, I)
         D, I = model.get_maximal_neighbor_activations(D_actual, I_actual)
 
-        neighbors = model.X[I]
+        neighbors = model.X[I].cuda()
         D_actual_at_maxes_mask = torch.cat(
             [
                 (I_actual[:, col] == I).unsqueeze(1)
@@ -38,6 +38,7 @@ class NeighborDiscriminatorFunction(Function):
 
     @staticmethod
     def backward(ctx, grad_output, _grad_indices):
+
         input, neighbors, scaled_D_actual = ctx.saved_tensors
         return (neighbors - input) / scaled_D_actual.unsqueeze(1), None
 
@@ -77,10 +78,10 @@ class NeighborDiscriminator(nn.Module):
     def get_X_w(self):
         X = self.X.data
         w_prime = self.w_prime
-        return torch.cat([X, w_prime], 1)
+        return torch.cat([X, w_prime.cpu()], 1)
 
     def update_index(self):
-        self.w_prime = self.get_w_prime()
+        self.w_prime = self.get_w_prime().cuda()
         self.X_w = self.get_X_w()
 
         gpu_resource = faiss.StandardGpuResources()
@@ -94,12 +95,12 @@ class NeighborDiscriminator(nn.Module):
         X_tilde_padded = torch.cat(
             [
                 X_tilde,
-                torch.zeros((X_tilde.shape[0], 1))
+                torch.zeros((X_tilde.shape[0], 1)).cuda()
             ],
             1
         )
-        D, I = self.index.search(X_tilde_padded.data.numpy(), self.k)
-        return torch.from_numpy(D), torch.from_numpy(I)
+        D, I = self.index.search(X_tilde_padded.cpu().data.numpy(), self.k)
+        return torch.from_numpy(D).cuda(), torch.from_numpy(I).cuda()
 
     def get_actual_distances(self, D, I):
         """Adjust the approximated neighbor activations to get the \|x_i - x\|"""
@@ -119,24 +120,24 @@ class NeighborDiscriminator(nn.Module):
                 for dist_row, index_row, index in zip(neighbor_activations, I, maximal_neighbor_activation_indices)
             ]
         )
-        return D_I[:, 0], D_I[:, 1].long()
+        return D_I[:, 0].cuda(), D_I[:, 1].long().cuda()
 
     def forward(self, X_tilde):
         return NeighborDiscriminatorFunction.apply(X_tilde, self)
 
     def accum_grads(self, X_tilde):
         _, I = self(X_tilde)
-        counts = torch.zeros(self.n)
+        counts = torch.zeros(self.n).cuda()
         for label in I:
             counts[label] += 1
         update_indices = torch.where(counts > 0)
-        self.w.grad = counts.unsqueeze(1)
-        return update_indices
+        self.w.grad = counts.unsqueeze(1).clone()
+        return update_indices[0].cuda()
 
     def project_weights(self, update_indices):
         with torch.no_grad():
             self.update_index()
-            self.w.data[update_indices] = self.forward(self.X[update_indices])[0].unsqueeze(1)
+            self.w.data[update_indices] = self.forward(self.X[update_indices].cuda())[0].unsqueeze(1)
             self.w -= self.w.mean()
             self.update_index()
 

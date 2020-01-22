@@ -26,6 +26,7 @@ from copy import deepcopy
 import subprocess
 from models.neighbor_discriminator import NeighborDiscriminator
 import torchvision.transforms as transforms
+import torchvision.datasets as torch_datasets
 
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = True
@@ -33,7 +34,7 @@ torch.backends.cudnn.benchmark = True
 DATA_PATH = "./data"
 
 def rip_cifar10_whole_tensor():
-    dataset = datasets.CIFAR10
+    dataset = torch_datasets.CIFAR10
     transform = transforms.Compose([
         transforms.Resize(32),
         transforms.ToTensor(),
@@ -85,14 +86,14 @@ def main():
     dataset = datasets.ImageDataset(args)
     train_loader = dataset.train
 
-    dis_net = NeighborDiscriminator(X=rip_cifar10_whole_tensor().view(50000, -1), K=args.K)
+    dis_net = NeighborDiscriminator(X=rip_cifar10_whole_tensor().view(50000, -1), K=args.K).cuda()
     # set optimizer
     gen_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, gen_net.parameters()),
                                      args.g_lr, (args.beta1, args.beta2))
     dis_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, dis_net.parameters()),
-                                    args.d_lr, (args.beta1, args.beta2))
+                                     args.d_lr, (args.beta1, args.beta2))
     gen_scheduler = LinearLrDecay(gen_optimizer, args.g_lr, 0.0, 0, args.max_iter * args.n_critic)
-    # dis_scheduler = LinearLrDecay(dis_optimizer, args.d_lr, 0.0, 0, args.max_iter * args.n_critic)
+    dis_scheduler = LinearLrDecay(dis_optimizer, args.d_lr, 0.0, 0, args.max_iter * args.n_critic)
 
     # set up data_loader
 

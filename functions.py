@@ -132,9 +132,9 @@ def train(args, gen_net: nn.Module, dis_net: NeighborDiscriminator, gen_optimize
         dis_optimizer.zero_grad()
 
         fake_imgs = gen_net(z).detach()
-        dis_net.accum_grads(fake_imgs)
+        update_indices = dis_net.accum_grads(fake_imgs)
         dis_optimizer.step()
-        dis_net.project_weights()
+        dis_net.project_weights(update_indices)
 
         # dis losses no longer informative
         #  writer.add_scalar('d_loss', d_loss.item(), global_steps)
@@ -142,12 +142,12 @@ def train(args, gen_net: nn.Module, dis_net: NeighborDiscriminator, gen_optimize
         # -----------------
         #  Train Generator
         # -----------------
-        for i in range(5):
+        for i in range(10):
             gen_optimizer.zero_grad()
 
             gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.gen_batch_size, args.latent_dim)))
             gen_imgs = gen_net(gen_z)
-            fake_validity = dis_net(gen_imgs)
+            fake_validity = dis_net(gen_imgs.view(args.gen_batch_size, -1))[0]
 
             # cal loss
             g_loss = -torch.mean(fake_validity)
