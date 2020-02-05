@@ -111,7 +111,7 @@ class NeighborDiscriminator(nn.Module):
     def get_maximal_neighbor_activations(self, D_actual, I):
         """Use the \|x_i - x\| to get the w_i - K \|x_i - x\|, and find the max and argmax over i"""
         neighbor_activations = self.w[I].squeeze(2) - self.K * D_actual
-        maximal_neighbor_activation_indices = torch.argmax(neighbor_activations, axis=1)
+        maximal_neighbor_activation_indices = torch.argmax(neighbor_activations, axis=1, keepdim=True)
 
         print(neighbor_activations.shape)
         print(maximal_neighbor_activation_indices.shape)
