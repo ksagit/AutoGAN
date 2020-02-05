@@ -102,14 +102,6 @@ class NeighborDiscriminator(nn.Module):
         D, I = self.index.search(X_tilde_padded.cpu().data.numpy(), self.k)
         return torch.from_numpy(D).cuda(), torch.from_numpy(I).cuda()
 
-    def get_actual_distances(self, D, I):
-        """Adjust the approximated neighbor activations to get the \|x_i - x\|"""
-        local_w_adjustments = self.w_prime[I].squeeze(2)
-        D_actual_squared = F.relu(D - local_w_adjustments ** 2)
-
-        D_actual = torch.sqrt(D_actual_squared)
-        return D_actual, I
-
     def get_maximal_neighbor_activations(self, D_actual, I):
         """Use the \|x_i - x\| to get the w_i - K \|x_i - x\|, and find the max and argmax over i"""
         neighbor_activations = self.w[I].squeeze(2) - self.K * D_actual
@@ -123,16 +115,15 @@ class NeighborDiscriminator(nn.Module):
         return D_I[:, 0].cuda(), D_I[:, 1].long().cuda()
 
     def forward(self, X_tilde):
-        return NeighborDiscriminatorFunction.apply(X_tilde, self)
+        with torch.no_grad():
+            _, maximal_neighbor_activation_indices = self.get_approximated_neighbor_activations(X_tilde)
 
-    def accum_grads(self, X_tilde):
-        _, I = self(X_tilde)
-        counts = torch.zeros(self.n).cuda()
-        for label in I:
-            counts[label] += 1
-        update_indices = torch.where(counts > 0)
-        self.w.grad = counts.unsqueeze(1).clone()
-        return update_indices[0].cuda()
+        neighbor_vectors = self.X[maximal_neighbor_activation_indices]  # batchsize x k x img size
+        differences = (neighbor_vectors - X_tilde.unsqueeze(1))  # batchsize x k x img size - batchsize x 1 x img size
+        distances = torch.norm(differences, axis=2)
+
+        return self.get_maximal_neighbor_activations(distances, maximal_neighbor_activation_indices)
+
 
     def project_weights(self, update_indices):
         with torch.no_grad():
