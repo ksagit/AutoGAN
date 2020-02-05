@@ -121,15 +121,28 @@ class NeighborDiscriminator(nn.Module):
         return D_I[:, 0].cuda(), D_I[:, 1].long().cuda()
 
     def forward(self, X_tilde):
+        print("in")
+
+        print(X_tilde.requires_grad)
+
         with torch.no_grad():
             _, maximal_neighbor_activation_indices = self.get_approximated_neighbor_activations(X_tilde)
 
         neighbor_vectors = self.X[maximal_neighbor_activation_indices]  # batchsize x k x img size
+
+        print(neighbor_vectors.requires_grad)
+
         differences = (neighbor_vectors - X_tilde.unsqueeze(1))  # batchsize x k x img size - batchsize x 1 x img size
+
+        print(differences.requires_grad)
+
         distances = torch.norm(differences, dim=2)
 
-        return self.get_maximal_neighbor_activations(distances, maximal_neighbor_activation_indices)
+        print(distances.requires_grad)
 
+        a = self.get_maximal_neighbor_activations(distances, maximal_neighbor_activation_indices)
+        print("out")
+        return a
 
     def project_weights(self, update_indices):
         with torch.no_grad():
