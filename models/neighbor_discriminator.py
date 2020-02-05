@@ -149,6 +149,7 @@ class NeighborDiscriminator(nn.Module):
 
         a = self.get_maximal_neighbor_activations(distances, maximal_neighbor_activation_indices)
         print("out")
+        print(a.shape)
         return a
 
     def project_weights(self, update_indices):
