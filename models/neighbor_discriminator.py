@@ -7,13 +7,18 @@ from torch.autograd import Function
 import logging
 
 logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.ERROR)
 
 def swig_ptr_from_FloatTensor(x: torch.Tensor):
     assert x.is_contiguous()
     assert x.dtype == torch.float32
     return faiss.cast_integer_to_float_ptr(
         x.storage().data_ptr() + x.storage_offset() * 4)
+
+def swig_ptr_from_LongTensor(x):
+    assert x.is_contiguous()
+    assert x.dtype == torch.int64, 'dtype=%s' % x.dtype
+    return faiss.cast_integer_to_long_ptr(x.storage().data_ptr())
 
 
 class NeighborDiscriminatorFunction(Function):
@@ -63,7 +68,7 @@ class NeighborDiscriminator(nn.Module):
     ):
         super(NeighborDiscriminator, self).__init__()
         self.X = X.view(X.shape[0], -1)
-        self.w = nn.Parameter(torch.zeros(X.shape[0], 1))
+        self.w = nn.Parameter(torch.zeros(X.shape[0], 1)).cuda()
         self.K = K
 
         self.n, self.d = self.X.shape
@@ -87,26 +92,42 @@ class NeighborDiscriminator(nn.Module):
         return torch.cat([X, w_prime], 1)
 
     def update_index(self):
-        self.w_prime = self.get_w_prime().cuda()
+        self.w_prime = self.get_w_prime()
         self.X_w = self.get_X_w()
 
         gpu_resource = faiss.StandardGpuResources()
         index = faiss.GpuIndexFlatL2(gpu_resource, self.d + 1)
-        index.add(self.X_w.data.cpu().numpy())
+        
+        X_w_casted = swig_ptr_from_FloatTensor(self.X_w)
+        index.add_c(self.n, X_w_casted)
         self.index = index
 
+      
     def get_approximated_neighbor_activations(self, X_tilde):
         """Get the nearest neighbors in \|x_i \oplus \sqrt{w_i'/K} - x \oplus 0\| """
-        X_tilde = X_tilde.view(X_tilde.shape[0], -1)
+        m = X_tilde.shape[0]
+        X_tilde = X_tilde.view(m, -1)
         X_tilde_padded = torch.cat(
             [
                 X_tilde,
-                torch.zeros((X_tilde.shape[0], 1)).cuda()
+                torch.zeros((m, 1)).cuda()
             ],
             1
         )
-        D, I = self.index.search(X_tilde_padded.cpu().data.numpy(), self.k)
-        return torch.from_numpy(D).cuda(), torch.from_numpy(I).cuda()
+        
+        X_tilde_padded_casted = swig_ptr_from_FloatTensor(X_tilde_padded)
+
+        # make space for indexes
+        distances = torch.zeros((m, self.k), dtype=torch.float32).cuda()
+        indexes = torch.zeros((m, self.k), dtype=torch.long).cuda()
+        
+        self.index.search_c(
+            X_tilde.shape[0], X_tilde_padded_casted, self.k,
+            swig_ptr_from_FloatTensor(distances), swig_ptr_from_LongTensor(indexes)
+        )
+
+        logger.info("If I don't print %s it doesn't work" % repr(indexes))  # fuck fuck fuck
+        return distances, indexes  
 
     def get_maximal_neighbor_activations(self, D_actual, I):
         """Use the \|x_i - x\| to get the w_i - K \|x_i - x\|, and find the max and argmax over i"""
@@ -118,6 +139,7 @@ class NeighborDiscriminator(nn.Module):
     
 
     def forward(self, X_tilde):
+        X_tilde = X_tilde.view(X_tilde.shape[0], -1)
         with torch.no_grad():
             _, maximal_neighbor_activation_indices = self.get_approximated_neighbor_activations(X_tilde)
 

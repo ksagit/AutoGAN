@@ -49,7 +49,7 @@ def rip_cifar10_whole_tensor():
         num_workers=0, pin_memory=False
     )
     for imgs, _labels in train:
-        return imgs
+        return imgs.cuda()
 
 def main():
     args = cfg.parse_args()
@@ -163,18 +163,16 @@ def main():
         train(args, gen_net, dis_net, gen_optimizer, dis_optimizer, gen_avg_param, train_loader, epoch, writer_dict,
               lr_schedulers)
 
-        if epoch and epoch % args.val_freq == 0 or epoch == int(args.max_epoch)-1:
-            backup_param = copy_params(gen_net)
-            load_params(gen_net, gen_avg_param)
-            inception_score, fid_score = validate(args, fixed_z, fid_stat, gen_net, writer_dict)
-            torch.cuda.empty_cache()
-            logger.info(f'Inception score: {inception_score}, FID score: {fid_score} || @ epoch {epoch}.')
-            load_params(gen_net, backup_param)
-            if fid_score < best_fid:
-                best_fid = fid_score
-                is_best = True
-            else:
-                is_best = False
+        # if epoch and epoch % args.val_freq == 0 or epoch == int(args.max_epoch)-1:
+        backup_param = copy_params(gen_net)
+        load_params(gen_net, gen_avg_param)
+        inception_score, fid_score = validate(args, fixed_z, fid_stat, gen_net, writer_dict)
+        torch.cuda.empty_cache()
+        logger.info(f'Inception score: {inception_score}, FID score: {fid_score} || @ epoch {epoch}.')
+        load_params(gen_net, backup_param)
+        if fid_score < best_fid:
+            best_fid = fid_score
+            is_best = True
         else:
             is_best = False
 

@@ -120,7 +120,10 @@ def train(args, gen_net: nn.Module, dis_net: NeighborDiscriminator, gen_optimize
     gen_net = gen_net.train()
     # dis_net = dis_net.train()
 
-    for iter_idx, (imgs, _) in enumerate(tqdm(train_loader)):
+    for iter_idx, (imgs, _) in enumerate(tqdm(train_loader, total=500)):
+        if iter_idx > 100:
+            break
+            
         global_steps = writer_dict['train_global_steps']
 
         # Sample noise as generator input
@@ -132,9 +135,11 @@ def train(args, gen_net: nn.Module, dis_net: NeighborDiscriminator, gen_optimize
         dis_optimizer.zero_grad()
 
         fake_imgs = gen_net(z).detach()
-        scores, _ = dis_net(fake_imgs)
+        fake_validity = dis_net(fake_imgs)
+        dis_loss = torch.mean(fake_validity)
+        dis_loss.backward()
         dis_optimizer.step()
-        dis_net.project_weights(update_indices)
+        dis_net.project_weights()
 
         # dis losses no longer informative
         #  writer.add_scalar('d_loss', d_loss.item(), global_steps)
@@ -147,7 +152,7 @@ def train(args, gen_net: nn.Module, dis_net: NeighborDiscriminator, gen_optimize
 
             gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.gen_batch_size, args.latent_dim)))
             gen_imgs = gen_net(gen_z)
-            fake_validity = dis_net(gen_imgs.view(args.gen_batch_size, -1))[0]
+            fake_validity = dis_net(gen_imgs)
 
             # cal loss
             g_loss = -torch.mean(fake_validity)

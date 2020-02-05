@@ -48,10 +48,6 @@ class TestNeighborDiscriminator(unittest.TestCase):
         d_gen = self.dis(self.x_gen)
         loss_gen = torch.sum(d_gen)
 
-        print(self.x_gen.requires_grad)
-        print(d_gen.requires_grad)
-        print(loss_gen.requires_grad)
-
         grad_model = grad(outputs=loss_gen, inputs=self.x_gen)
 
         # Get the exact gradient of the maximal neighbor activation w.r.t the input
