@@ -113,6 +113,9 @@ class NeighborDiscriminator(nn.Module):
         neighbor_activations = self.w[I].squeeze(2) - self.K * D_actual
         maximal_neighbor_activation_indices = torch.argmax(neighbor_activations, axis=1)
 
+        print(neighbor_activations.shape)
+        print(maximal_neighbor_activation_indices.shape)
+
         maximal_neighbor_activations = neighbor_activations.gather(1, maximal_neighbor_activation_indices)
         return maximal_neighbor_activations
 
