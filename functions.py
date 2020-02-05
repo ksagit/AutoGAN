@@ -129,12 +129,12 @@ def train(args, gen_net: nn.Module, dis_net: NeighborDiscriminator, gen_optimize
         # ---------------------
         #  Train Discriminator
         # ---------------------
-        # dis_optimizer.zero_grad()
-        #
-        # fake_imgs = gen_net(z).detach()
-        # update_indices = dis_net.accum_grads(fake_imgs)
-        # dis_optimizer.step()
-        # dis_net.project_weights(update_indices)
+        dis_optimizer.zero_grad()
+
+        fake_imgs = gen_net(z).detach()
+        update_indices = dis_net.accum_grads(fake_imgs)
+        dis_optimizer.step()
+        dis_net.project_weights(update_indices)
 
         # dis losses no longer informative
         #  writer.add_scalar('d_loss', d_loss.item(), global_steps)
