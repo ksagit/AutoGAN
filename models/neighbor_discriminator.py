@@ -42,6 +42,12 @@ class NeighborDiscriminatorFunction(Function):
         input, neighbors, scaled_D_actual = ctx.saved_tensors
         return (neighbors - input) / scaled_D_actual.unsqueeze(1), None
 
+class DummyDistanceFunction(Function):
+
+    @staticmethod
+    def forward(ctx, distance_hints):
+        pass
+
 
 class NeighborDiscriminator(nn.Module):
 
@@ -78,7 +84,7 @@ class NeighborDiscriminator(nn.Module):
     def get_X_w(self):
         X = self.X.data
         w_prime = self.w_prime
-        return torch.cat([X, w_prime.cpu()], 1)
+        return torch.cat([X, w_prime], 1)
 
     def update_index(self):
         self.w_prime = self.get_w_prime().cuda()
