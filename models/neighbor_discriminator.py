@@ -112,13 +112,17 @@ class NeighborDiscriminator(nn.Module):
         """Use the \|x_i - x\| to get the w_i - K \|x_i - x\|, and find the max and argmax over i"""
         neighbor_activations = self.w[I].squeeze(2) - self.K * D_actual
         maximal_neighbor_activation_indices = torch.argmax(neighbor_activations, axis=1)
-        D_I = torch.Tensor(
-            [
-                (dist_row[index], index_row[index])
-                for dist_row, index_row, index in zip(neighbor_activations, I, maximal_neighbor_activation_indices)
-            ]
-        )
-        return D_I[:, 0].cuda(), D_I[:, 1].long().cuda()
+
+        maximal_neighbor_activations = neighbor_activations.gather(1, maximal_neighbor_activation_indices)
+        return maximal_neighbor_activations
+
+        # D_I = torch.Tensor(
+        #     [
+        #         (dist_row[index])
+        #         for dist_row, index in zip(neighbor_activations, maximal_neighbor_activation_indices)
+        #     ]
+        # )
+        # return D_I[:, 0].cuda(), D_I[:, 1].long().cuda()
 
     def forward(self, X_tilde):
         print("in")

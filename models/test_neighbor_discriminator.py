@@ -25,7 +25,7 @@ class TestNeighborDiscriminator(unittest.TestCase):
 
     def test_neighbor_activation_correctness(self):
         """For the baseline (exact) NeighborDiscriminator, we should have exact matches"""
-        maximal_neighbor_activations = self.dis(self.x_gen)[0]
+        maximal_neighbor_activations = self.dis(self.x_gen)
 
         pairwise_distances = torch_pairwise_distances(self.X, self.x_gen)
         exact_neighbor_activations = -self.dis.K * pairwise_distances + self.dis.w.data
@@ -45,7 +45,7 @@ class TestNeighborDiscriminator(unittest.TestCase):
             Where i is the index of the maximal neighbor activation.
         """
         # Get the gradient from the model
-        d_gen = self.dis(self.x_gen)[0]
+        d_gen = self.dis(self.x_gen)
         loss_gen = torch.sum(d_gen)
 
         print(self.x_gen.requires_grad)
