@@ -136,8 +136,6 @@ class NeighborDiscriminator(nn.Module):
 
     def project_weights(self, update_indices):
         with torch.no_grad():
-            self.update_index()
-            self.w.data[update_indices] = self.forward(self.X[update_indices].cuda())[0].unsqueeze(1)
             self.w -= self.w.mean()
             self.update_index()
 
