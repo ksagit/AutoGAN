@@ -113,46 +113,22 @@ class NeighborDiscriminator(nn.Module):
         neighbor_activations = self.w[I].squeeze(2) - self.K * D_actual
         maximal_neighbor_activation_indices = torch.argmax(neighbor_activations, axis=1, keepdim=True)
 
-        print(neighbor_activations.shape)
-        print(maximal_neighbor_activation_indices.shape)
-
         maximal_neighbor_activations = neighbor_activations.gather(1, maximal_neighbor_activation_indices)
         return maximal_neighbor_activations.squeeze(1)
-
-        # D_I = torch.Tensor(
-        #     [
-        #         (dist_row[index])
-        #         for dist_row, index in zip(neighbor_activations, maximal_neighbor_activation_indices)
-        #     ]
-        # )
-        # return D_I[:, 0].cuda(), D_I[:, 1].long().cuda()
+    
 
     def forward(self, X_tilde):
-        print("in")
-
-        print(X_tilde.requires_grad)
-
         with torch.no_grad():
             _, maximal_neighbor_activation_indices = self.get_approximated_neighbor_activations(X_tilde)
 
         neighbor_vectors = self.X[maximal_neighbor_activation_indices]  # batchsize x k x img size
-
-        print(neighbor_vectors.requires_grad)
-
         differences = (neighbor_vectors - X_tilde.unsqueeze(1))  # batchsize x k x img size - batchsize x 1 x img size
-
-        print(differences.requires_grad)
-
         distances = torch.norm(differences, dim=2)
 
-        print(distances.requires_grad)
+        return self.get_maximal_neighbor_activations(distances, maximal_neighbor_activation_indices)
 
-        a = self.get_maximal_neighbor_activations(distances, maximal_neighbor_activation_indices)
-        print("out")
-        print(a.shape)
-        return a
 
-    def project_weights(self, update_indices):
+    def project_weights(self):
         with torch.no_grad():
             self.w -= self.w.mean()
             self.update_index()
