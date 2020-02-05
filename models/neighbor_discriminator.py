@@ -92,7 +92,7 @@ class NeighborDiscriminator(nn.Module):
 
         gpu_resource = faiss.StandardGpuResources()
         index = faiss.GpuIndexFlatL2(gpu_resource, self.d + 1)
-        index.add(self.X_w.data.numpy())
+        index.add(self.X_w.data.cpu().numpy())
         self.index = index
 
     def get_approximated_neighbor_activations(self, X_tilde):
