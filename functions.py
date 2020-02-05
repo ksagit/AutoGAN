@@ -22,6 +22,11 @@ from utils.inception_score import get_inception_score
 logger = logging.getLogger(__name__)
 
 
+def stdev(t: torch.Tensor) -> float:
+    mu = t.mean(dim=0, keepdim=True)
+    deviations = torch.sum((t - mu)**2, dim=1)
+    return torch.sqrt(torch.sum(deviations) / (t.shape[0] - 1))
+
 def train_shared(args, gen_net: nn.Module, dis_net: nn.Module, g_loss_history, d_loss_history, controller, gen_optimizer
                  , dis_optimizer, train_loader, prev_hiddens=None, prev_archs=None):
     dynamic_reset = False
@@ -77,6 +82,7 @@ def train_shared(args, gen_net: nn.Module, dis_net: nn.Module, g_loss_history, d
 
                 gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.gen_batch_size, args.latent_dim)))
                 gen_imgs = gen_net(gen_z)
+                spread = stdev(gen_imgs.view(gen_imgs.shape[0], -1))
                 fake_validity = dis_net(gen_imgs)
 
                 # cal loss
@@ -93,7 +99,7 @@ def train_shared(args, gen_net: nn.Module, dis_net: nn.Module, g_loss_history, d
                 logger.info(
                     "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]" %
                     (epoch, args.shared_epoch, iter_idx % len(train_loader), len(train_loader), d_loss.item(),
-                     g_loss.item()))
+                     g_loss.item()), spread)
 
             # check window
             if g_loss_history.is_full():
@@ -155,6 +161,7 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
 
             gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.gen_batch_size, args.latent_dim)))
             gen_imgs = gen_net(gen_z)
+            spread = stdev(gen_imgs.view(gen_imgs.shape[0], -1))
             fake_validity = dis_net(gen_imgs)
 
             # cal loss
@@ -180,8 +187,8 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
         # verbose
         if gen_step and iter_idx % args.print_freq == 0:
             tqdm.write(
-                "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]" %
-                (epoch, args.max_epoch, iter_idx % len(train_loader), len(train_loader), d_loss.item(), g_loss.item()))
+                "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f] [Spread: %f]" %
+                (epoch, args.max_epoch, iter_idx % len(train_loader), len(train_loader), d_loss.item(), g_loss.item(), spread))
 
         writer_dict['train_global_steps'] = global_steps + 1
 
