@@ -53,7 +53,7 @@ def parse_args():
     parser.add_argument(
         '--d_lr',
         type=float,
-        default=0.0002,
+        default=0.001,
         help='adam: disc learning rate')
     parser.add_argument(
         '--ctrl_lr',

@@ -147,7 +147,7 @@ def train(args, gen_net: nn.Module, dis_net: NeighborDiscriminator, gen_optimize
         # -----------------
         #  Train Generator
         # -----------------
-        for i in range(1):
+        for i in range(5):
             gen_optimizer.zero_grad()
 
             gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.gen_batch_size, args.latent_dim)))

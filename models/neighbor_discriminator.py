@@ -68,7 +68,7 @@ class NeighborDiscriminator(nn.Module):
     ):
         super(NeighborDiscriminator, self).__init__()
         self.X = X.view(X.shape[0], -1)
-        self.w = nn.Parameter(torch.zeros(X.shape[0], 1)).cuda()
+        self.w = nn.Parameter(torch.zeros(X.shape[0], 1))
         self.K = K
 
         self.n, self.d = self.X.shape
@@ -84,7 +84,7 @@ class NeighborDiscriminator(nn.Module):
     def get_w_prime(self):
         w_prime = -(self.w - torch.max(self.w))
         w_prime = torch.sqrt(w_prime / self.K)
-        return w_prime
+        return w_prime.cuda()
 
     def get_X_w(self):
         X = self.X.data
