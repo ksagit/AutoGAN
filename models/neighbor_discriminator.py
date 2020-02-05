@@ -126,7 +126,7 @@ class NeighborDiscriminator(nn.Module):
 
         neighbor_vectors = self.X[maximal_neighbor_activation_indices]  # batchsize x k x img size
         differences = (neighbor_vectors - X_tilde.unsqueeze(1))  # batchsize x k x img size - batchsize x 1 x img size
-        distances = torch.norm(differences, axis=2)
+        distances = torch.norm(differences, dim=2)
 
         return self.get_maximal_neighbor_activations(distances, maximal_neighbor_activation_indices)
 
