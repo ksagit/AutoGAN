@@ -128,7 +128,7 @@ def train(args, gen_net: nn.Module, dis_net: NeighborDiscriminator, gen_optimize
     gen_net = gen_net.train()
     # dis_net = dis_net.train()
 
-    n_dis_iters = 16
+    n_dis_iters = 8
     n_gen_iters = 1
 
     for iter_idx in tqdm(range(int(782 / (n_dis_iters / 2 + n_gen_iters)))):

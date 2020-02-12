@@ -160,7 +160,7 @@ def parse_args():
         default='controller',
         help='path of controller')
     parser.add_argument('--eval_batch_size', type=int, default=100)
-    parser.add_argument('--num_eval_imgs', type=int, default=50000)
+    parser.add_argument('--num_eval_imgs', type=int, default=5000)
     parser.add_argument(
         '--bottom_width',
         type=int,
