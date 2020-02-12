@@ -30,6 +30,30 @@ torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = True
 
 
+from models.neighbor_discriminator import NeighborDiscriminator
+import torchvision.transforms as transforms
+import torchvision.datasets as torch_datasets
+
+
+def rip_cifar10_whole_tensor():
+    dataset = torch_datasets.CIFAR10
+    transform = transforms.Compose([
+        transforms.Resize(32),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    ])
+
+    train = torch.utils.data.DataLoader(
+        dataset(
+            root=DATA_PATH, train=True, transform=transform, download=False
+        ),
+        batch_size=50000, shuffle=True,
+        num_workers=0, pin_memory=False
+    )
+    for imgs, _labels in train:
+        return imgs.cuda()
+
+
 def main():
     args = cfg.parse_args()
     torch.cuda.manual_seed(args.random_seed)
