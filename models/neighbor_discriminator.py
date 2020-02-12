@@ -172,7 +172,8 @@ class NeighborDiscriminator(nn.Module):
         differences = (neighbor_vectors - X_tilde.unsqueeze(1))  # batchsize x k x img size - batchsize x 1 x img size
         distances = torch.norm(differences, dim=2)
 
-        return self.get_maximal_neighbor_activations(distances, maximal_neighbor_activation_indices)
+        dists = self.get_maximal_neighbor_activations(distances, maximal_neighbor_activation_indices)
+        return torch.sigmoid(dists)
 
 
     def project_weights(self):
