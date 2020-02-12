@@ -21,7 +21,7 @@ def parse_args():
     parser.add_argument(
         '--alpha',
         type=float,
-        default=0,
+        default=.1,
         help='proportion of discriminator to get from the neighborhood discriminator'
     )
     parser.add_argument(
