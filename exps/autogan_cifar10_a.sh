@@ -20,5 +20,5 @@ python train.py \
 --beta2 0.9 \
 --init_type xavier_uniform \
 --n_critic 5 \
---val_freq 20 \
+--val_freq 1 \
 --exp_name autogan_cifar10_a
