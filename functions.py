@@ -145,7 +145,7 @@ def train(args, gen_net: nn.Module, dis_net: NeighborDiscriminator, gen_optimize
             dis_optimizer.zero_grad()
 
             fake_imgs = gen_net(z).detach()
-            fake_validity = dis_net(fake_imgs)
+            fake_validity = torch.tanh(dis_net(fake_imgs))
             dis_loss = torch.mean(fake_validity)
             dis_loss.backward()
 
