@@ -143,29 +143,37 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_op
         fake_imgs = gen_net(z).detach()
         assert fake_imgs.size() == real_imgs.size()
 
-        fake_validity = args.alpha * dis_net_neighbor(fake_imgs) + (1 - args.alpha) * dis_net(fake_imgs)
+        fake_validity = dis_net(fake_imgs)
 
         # cal loss
         d_loss = torch.mean(nn.ReLU(inplace=True)(1.0 - real_validity)) + \
                  torch.mean(nn.ReLU(inplace=True)(1 + fake_validity))
         d_loss.backward()
         dis_optimizer.step()
-        dis_neighbor_optimizer.step()
 
         writer.add_scalar('d_loss', d_loss.item(), global_steps)
 
         # -----------------
         #  Train Generator
         # -----------------
-        if global_steps % args.n_critic == 0:
+        if global_steps % 50 == 0:
             dis_net_neighbor.update_index()
+            num_chunks = 500
+            chunk_size = len(dis_net_neighbor.X) // num_chunks
+            new_w = torch.zeros_like(dis_net_neighbor.w)
+            for chunk_idx in range(num_chunks):
+                chunk_start, chunk_end = chunk_size * chunk_idx, chunk_size * (chunk_idx + 1)
+                new_w[chunk_start: chunk_end][:, 0] = dis_net_neighbor(dis_net_neighbor.X[chunk_start: chunk_end])
+                assert (new_w.shape == dis_net_neighbor.w.shape)
+            dis_net_neighbor.w.data = new_w
 
+        if global_steps % args.n_critic == 0:
             gen_optimizer.zero_grad()
 
             gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.gen_batch_size, args.latent_dim)))
             gen_imgs = gen_net(gen_z)
             spread = stdev(gen_imgs.view(gen_imgs.shape[0], -1))
-            fake_validity = dis_net(gen_imgs)
+            fake_validity = args.alpha * dis_net_neighbor(fake_imgs) + (1 - args.alpha) * dis_net(fake_imgs)
 
             # cal loss
             g_loss = -torch.mean(fake_validity)

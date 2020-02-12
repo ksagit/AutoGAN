@@ -88,7 +88,7 @@ def main():
     gen_net.apply(weights_init)
     dis_net.apply(weights_init)
 
-    dis_net_neighbor = NeighborDiscriminator(X=rip_cifar10_whole_tensor())
+    dis_net_neighbor = NeighborDiscriminator(X=rip_cifar10_whole_tensor()).cuda()
 
     # set optimizer
     gen_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, gen_net.parameters()),
