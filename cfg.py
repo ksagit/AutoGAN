@@ -53,7 +53,7 @@ def parse_args():
     parser.add_argument(
         '--d_lr',
         type=float,
-        default=0.001,
+        default=.0002,
         help='adam: disc learning rate')
     parser.add_argument(
         '--ctrl_lr',
@@ -125,7 +125,7 @@ def parse_args():
     parser.add_argument(
         '--g_spectral_norm',
         type=str2bool,
-        default=False,
+        default=True,
         help='add spectral_norm on generator?')
     parser.add_argument(
         '--dataset',
@@ -160,7 +160,7 @@ def parse_args():
         default='controller',
         help='path of controller')
     parser.add_argument('--eval_batch_size', type=int, default=100)
-    parser.add_argument('--num_eval_imgs', type=int, default=50000)
+    parser.add_argument('--num_eval_imgs', type=int, default=5000)
     parser.add_argument(
         '--bottom_width',
         type=int,

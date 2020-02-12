@@ -62,13 +62,16 @@ class NeighborDiscriminator(nn.Module):
             K: float = 1,
             nlist: int = 100,
             nprobe: int = 10,
-            k: int = 10,  # number of neighbors to check
+            k: int = 64,  # number of neighbors to check
             eta: float = .1
 
     ):
         super(NeighborDiscriminator, self).__init__()
         self.X = X.view(X.shape[0], -1)
         self.w = nn.Parameter(torch.zeros(X.shape[0], 1))
+
+        nn.init.xavier_uniform(self.w.data, 1.)
+
         self.K = K
 
         self.n, self.d = self.X.shape
@@ -78,7 +81,6 @@ class NeighborDiscriminator(nn.Module):
 
         self.eta = eta
 
-        # also initializes self.X_w, self.w_prime
         self.update_index()
 
     def get_w_prime(self):
@@ -91,19 +93,28 @@ class NeighborDiscriminator(nn.Module):
         w_prime = self.w_prime
         return torch.cat([X, w_prime], 1)
 
+    def alloc_index(self):
+        self.gpu_resource = faiss.StandardGpuResources()
+        self.index = faiss.GpuIndexFlatL2(self.gpu_resource, self.d + 1)
+
+    def free_index(self):
+        del self.gpu_resource
+        del self.index
+
     def update_index(self):
+        if not(hasattr(self, 'index')) or not(hasattr(self, 'gpu_resource')):
+            self.alloc_index()
+
         self.w_prime = self.get_w_prime()
         self.X_w = self.get_X_w()
 
-        gpu_resource = faiss.StandardGpuResources()
-        index = faiss.GpuIndexFlatL2(gpu_resource, self.d + 1)
+        self.index.reset()
         
         X_w_casted = swig_ptr_from_FloatTensor(self.X_w)
-        index.add_c(self.n, X_w_casted)
-        self.index = index
+        self.index.add_c(self.n, X_w_casted)
 
       
-    def get_approximated_neighbor_activations(self, X_tilde):
+    def get_approximated_neighbor_activations(self, X_tilde, noise=0):
         """Get the nearest neighbors in \|x_i \oplus \sqrt{w_i'/K} - x \oplus 0\| """
         m = X_tilde.shape[0]
         X_tilde = X_tilde.view(m, -1)
@@ -127,14 +138,28 @@ class NeighborDiscriminator(nn.Module):
         )
 
         logger.info("If I don't print %s it doesn't work" % repr(indexes))  # fuck fuck fuck
-        return distances, indexes  
 
-    def get_maximal_neighbor_activations(self, D_actual, I):
+        if noise != 0.0:
+            noise_frac = int(m * noise)
+            indices_to_noise = torch.randperm(m) < noise_frac
+
+            noisy_labels = torch.randint(high=50000, size=(noise_frac,)).cuda()
+            noisy_labels = noisy_labels.repeat((self.k, 1)).T
+
+            # assert(indexes[indices_to_noise].shape == noisy_labels.shape)
+            indexes[indices_to_noise] = noisy_labels
+
+        return distances, indexes
+
+    def get_maximal_neighbor_activations(self, distances, maximal_neighbor_activation_indices):
         """Use the \|x_i - x\| to get the w_i - K \|x_i - x\|, and find the max and argmax over i"""
-        neighbor_activations = self.w[I].squeeze(2) - self.K * D_actual
-        maximal_neighbor_activation_indices = torch.argmax(neighbor_activations, axis=1, keepdim=True)
+        neighbor_activations = self.w[maximal_neighbor_activation_indices].squeeze(2) - self.K * distances
+        
+        neighbor_activation_argmaxes = torch.argmax(neighbor_activations, axis=1, keepdim=True)
+        # maximal_neighbor_activation_indices = torch.randint(high=self.k, size=(neighbor_activations.shape[0], 1)).cuda()
 
-        maximal_neighbor_activations = neighbor_activations.gather(1, maximal_neighbor_activation_indices)
+        maximal_neighbor_activations = neighbor_activations.gather(1, neighbor_activation_argmaxes)
+        # maximal_neighbor_activations = torch.sum(neighbor_activations, dim=1, keepdim=True)
         return maximal_neighbor_activations.squeeze(1)
     
 

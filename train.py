@@ -82,16 +82,18 @@ def main():
             nn.init.constant_(m.bias.data, 0.0)
 
     gen_net.apply(weights_init)
-    # dis_net.apply(weights_init)
+
     dataset = datasets.ImageDataset(args)
     train_loader = dataset.train
 
     dis_net = NeighborDiscriminator(X=rip_cifar10_whole_tensor().view(50000, -1), K=args.K).cuda()
+    dis_net.apply(weights_init)
+
     # set optimizer
     gen_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, gen_net.parameters()),
                                      args.g_lr, (args.beta1, args.beta2))
-    dis_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, dis_net.parameters()),
-                                     args.d_lr, (args.beta1, args.beta2))
+    dis_optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, dis_net.parameters()),
+                                     args.d_lr)
     gen_scheduler = LinearLrDecay(gen_optimizer, args.g_lr, 0.0, 0, args.max_iter * args.n_critic)
     dis_scheduler = LinearLrDecay(dis_optimizer, args.d_lr, 0.0, 0, args.max_iter * args.n_critic)
 
@@ -166,8 +168,12 @@ def main():
         # if epoch and epoch % args.val_freq == 0 or epoch == int(args.max_epoch)-1:
         backup_param = copy_params(gen_net)
         load_params(gen_net, gen_avg_param)
-        inception_score, fid_score = validate(args, fixed_z, fid_stat, gen_net, writer_dict)
         torch.cuda.empty_cache()
+
+        # dis_net.free_index()
+        inception_score, fid_score = validate(args, fixed_z, fid_stat, gen_net, dis_net, writer_dict)
+        dis_net.update_index()
+
         logger.info(f'Inception score: {inception_score}, FID score: {fid_score} || @ epoch {epoch}.')
         load_params(gen_net, backup_param)
         if fid_score < best_fid:
@@ -191,6 +197,7 @@ def main():
             'path_helper': args.path_helper
         }, is_best, args.path_helper['ckpt_path'])
         del avg_gen_net
+        torch.cuda.empty_cache()
 
 
 if __name__ == '__main__':

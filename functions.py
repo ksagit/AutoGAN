@@ -119,6 +119,8 @@ def train_shared(args, gen_net: nn.Module, dis_net: nn.Module, g_loss_history, d
 
 def train(args, gen_net: nn.Module, dis_net: NeighborDiscriminator, gen_optimizer, dis_optimizer, gen_avg_param, train_loader,
           epoch, writer_dict, schedulers=None):
+
+    dis_net.update_index()
     writer = writer_dict['writer']
     gen_step = 0
 
@@ -126,34 +128,51 @@ def train(args, gen_net: nn.Module, dis_net: NeighborDiscriminator, gen_optimize
     gen_net = gen_net.train()
     # dis_net = dis_net.train()
 
-    for iter_idx, (imgs, _) in enumerate(tqdm(train_loader, total=500)):
-        if iter_idx > 100:
-            break
+    n_dis_iters = 16
+    n_gen_iters = 1
+
+    for iter_idx in tqdm(range(int(782 / (n_dis_iters / 2 + n_gen_iters)))):
             
         global_steps = writer_dict['train_global_steps']
 
-        # Sample noise as generator input
-        z = torch.cuda.FloatTensor(np.random.normal(0, 1, (512, args.latent_dim)))
+        for i in range(n_dis_iters):
+            # Sample noise as generator input
+            z = torch.cuda.FloatTensor(np.random.normal(-1, 1, (256, args.latent_dim)))
 
-        # ---------------------
-        #  Train Discriminator
-        # ---------------------
-        dis_optimizer.zero_grad()
+            # ---------------------
+            #  Train Discriminator
+            # ---------------------
+            dis_optimizer.zero_grad()
 
-        fake_imgs = gen_net(z).detach()
-        fake_validity = dis_net(fake_imgs)
-        dis_loss = torch.mean(fake_validity)
-        dis_loss.backward()
-        dis_optimizer.step()
+            fake_imgs = gen_net(z).detach()
+            fake_validity = dis_net(fake_imgs)
+            dis_loss = torch.mean(fake_validity)
+            dis_loss.backward()
+
+            idx, _wtfisthis = torch.where(dis_net.w.grad.data != 0)
+            # print(idx)
+            # print(dis_net.w.grad.data[idx])
+            # print(dis_net.w[idx])
+
+            c = ((dis_net.w.grad.data))
+            # print(torch.sum(c))
+            # print(c[torch.where(c != 0)])
+
+            dis_optimizer.step()
+            # print(dis_net.w[idx])
+            # print()
+            # print()
+            # print(torch.sum(dis_net.w.data))
+
         dis_net.project_weights()
-
         # dis losses no longer informative
         #  writer.add_scalar('d_loss', d_loss.item(), global_steps)
 
-        # -----------------
-        #  Train Generator
-        # -----------------
-        for i in range(5):
+        for i in range(n_gen_iters):
+            # -----------------
+            #  Train Generator
+            # -----------------
+
             gen_optimizer.zero_grad()
 
             gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.gen_batch_size, args.latent_dim)))
@@ -184,8 +203,10 @@ def train(args, gen_net: nn.Module, dis_net: NeighborDiscriminator, gen_optimize
         if iter_idx % args.print_freq == 0:
             tqdm.write(
                 "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f] [Spread: %f]" %
-                (epoch, args.max_epoch, iter_idx % len(train_loader), len(train_loader), d_loss.item(), g_loss.item(), spread))
+                (epoch, args.max_epoch, iter_idx % len(train_loader), len(train_loader), dis_loss.item(), g_loss.item(), spread))
         writer_dict['train_global_steps'] = global_steps + 1
+
+    dis_net.index.reset()
 
 
 def train_controller(args, controller, ctrl_optimizer, gen_net, prev_hiddens, prev_archs, writer_dict):
@@ -269,7 +290,7 @@ def get_is(args, gen_net: nn.Module, num_img):
     return mean
 
 
-def validate(args, fixed_z, fid_stat, gen_net: nn.Module, writer_dict, clean_dir=True):
+def validate(args, fixed_z, fid_stat, gen_net: nn.Module, dis_net, writer_dict, clean_dir=True):
     writer = writer_dict['writer']
     global_steps = writer_dict['valid_global_steps']
 
@@ -304,7 +325,7 @@ def validate(args, fixed_z, fid_stat, gen_net: nn.Module, writer_dict, clean_dir
 
     # get fid score
     logger.info('=> calculate fid score')
-    fid_score = calculate_fid_given_paths([fid_buffer_dir, fid_stat], inception_path=None)
+    fid_score = 0  # calculate_fid_given_paths([fid_buffer_dir, fid_stat], inception_path=None)
     print(f"FID score: {fid_score}")
 
     if clean_dir:
