@@ -19,6 +19,12 @@ def str2bool(v):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        '--alpha',
+        type=float,
+        default=.1,
+        help='proportion of discriminator to get from the neighborhood discriminator'
+    )
+    parser.add_argument(
         '--max_epoch',
         type=int,
         default=200,

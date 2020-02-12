@@ -116,7 +116,7 @@ def train_shared(args, gen_net: nn.Module, dis_net: nn.Module, g_loss_history, d
     return dynamic_reset
 
 
-def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optimizer, gen_avg_param, train_loader,
+def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_optimizer, dis_optimizer, dis_neighbor_optimizer, gen_avg_param, train_loader,
           epoch, writer_dict, schedulers=None):
     writer = writer_dict['writer']
     gen_step = 0
@@ -143,13 +143,14 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
         fake_imgs = gen_net(z).detach()
         assert fake_imgs.size() == real_imgs.size()
 
-        fake_validity = dis_net(fake_imgs)
+        fake_validity = args.alpha * dis_net_neighbor(fake_imgs) + (1 - args.alpha) * dis_net(fake_imgs)
 
         # cal loss
         d_loss = torch.mean(nn.ReLU(inplace=True)(1.0 - real_validity)) + \
                  torch.mean(nn.ReLU(inplace=True)(1 + fake_validity))
         d_loss.backward()
         dis_optimizer.step()
+        dis_neighbor_optimizer.step()
 
         writer.add_scalar('d_loss', d_loss.item(), global_steps)
 
@@ -157,6 +158,8 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
         #  Train Generator
         # -----------------
         if global_steps % args.n_critic == 0:
+            dis_net_neighbor.update_index()
+
             gen_optimizer.zero_grad()
 
             gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.gen_batch_size, args.latent_dim)))

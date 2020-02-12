@@ -34,6 +34,8 @@ from models.neighbor_discriminator import NeighborDiscriminator
 import torchvision.transforms as transforms
 import torchvision.datasets as torch_datasets
 
+DATA_PATH = "./data"
+
 
 def rip_cifar10_whole_tensor():
     dataset = torch_datasets.CIFAR10
@@ -86,11 +88,14 @@ def main():
     gen_net.apply(weights_init)
     dis_net.apply(weights_init)
 
+    dis_net_neighbor = NeighborDiscriminator(X=rip_cifar10_whole_tensor())
+
     # set optimizer
     gen_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, gen_net.parameters()),
                                      args.g_lr, (args.beta1, args.beta2))
     dis_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, dis_net.parameters()),
                                      args.d_lr, (args.beta1, args.beta2))
+    dis_neighbor_optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, dis_net.parameters()), .02)
     gen_scheduler = LinearLrDecay(gen_optimizer, args.g_lr, 0.0, 0, args.max_iter * args.n_critic)
     dis_scheduler = LinearLrDecay(dis_optimizer, args.d_lr, 0.0, 0, args.max_iter * args.n_critic)
 
@@ -160,7 +165,7 @@ def main():
     # train loop
     for epoch in tqdm(range(int(start_epoch), int(args.max_epoch)), desc='total progress'):
         lr_schedulers = (gen_scheduler, dis_scheduler) if args.lr_decay else None
-        train(args, gen_net, dis_net, gen_optimizer, dis_optimizer, gen_avg_param, train_loader, epoch, writer_dict,
+        train(args, gen_net, dis_net, dis_net_neighbor, gen_optimizer, dis_optimizer, dis_neighbor_optimizer, gen_avg_param, train_loader, epoch, writer_dict,
               lr_schedulers)
 
         if True:  # epoch and epoch % args.val_freq == 0 or epoch == int(args.max_epoch)-1:
