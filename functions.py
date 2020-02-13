@@ -144,6 +144,8 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_op
         assert fake_imgs.size() == real_imgs.size()
 
         fake_validity = dis_net(fake_imgs)
+        # print(fake_imgs.shape)
+        # print(fake_imgs.shape)
 
         # cal loss
         d_loss = torch.mean(nn.ReLU(inplace=True)(1.0 - real_validity)) + \
@@ -156,16 +158,20 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_op
         # -----------------
         #  Train Generator
         # -----------------
-        if global_steps % 50 == 0:
-            dis_net_neighbor.update_index()
-            num_chunks = 500
-            chunk_size = len(dis_net_neighbor.X) // num_chunks
-            new_w = torch.zeros_like(dis_net_neighbor.w)
-            for chunk_idx in range(num_chunks):
-                chunk_start, chunk_end = chunk_size * chunk_idx, chunk_size * (chunk_idx + 1)
-                new_w[chunk_start: chunk_end][:, 0] = dis_net_neighbor(dis_net_neighbor.X[chunk_start: chunk_end])
-                assert (new_w.shape == dis_net_neighbor.w.shape)
-            dis_net_neighbor.w.data = new_w
+        if global_steps % 500 == 0:
+            with torch.no_grad():
+                dis_net_neighbor.update_index()
+                num_chunks = 500
+                chunk_size = len(dis_net_neighbor.X) // num_chunks
+                new_w = torch.zeros_like(dis_net_neighbor.w)
+                for chunk_idx in range(num_chunks):
+                    chunk_start, chunk_end = chunk_size * chunk_idx, chunk_size * (chunk_idx + 1)
+
+                    x = dis_net_neighbor.X[chunk_start: chunk_end].view(-1, 3, 32, 32)
+
+                    new_w[chunk_start: chunk_end] = dis_net(x)
+                    assert (new_w.shape == dis_net_neighbor.w.shape)
+                dis_net_neighbor.w.data = new_w
 
         if global_steps % args.n_critic == 0:
             gen_optimizer.zero_grad()
@@ -183,6 +189,8 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_op
 
             # adjust learning rate
             if schedulers:
+                print("foo bar baz")
+
                 gen_scheduler, dis_scheduler = schedulers
                 g_lr = gen_scheduler.step(global_steps)
                 d_lr = dis_scheduler.step(global_steps)
@@ -316,7 +324,13 @@ def validate(args, fixed_z, fid_stat, gen_net: nn.Module, writer_dict, clean_dir
 
     # get inception score
     logger.info('=> calculate inception score')
-    mean, std = get_inception_score(img_list)
+    for _ in range(10):
+        try:
+            mean, std = get_inception_score(img_list)
+            break
+        except:
+            pass
+
     print(f"Inception score: {mean}")
 
     # get fid score

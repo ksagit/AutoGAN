@@ -62,7 +62,7 @@ class NeighborDiscriminator(nn.Module):
             K: float = 1,
             nlist: int = 100,
             nprobe: int = 10,
-            k: int = 128,  # number of neighbors to check
+            k: int = 256,  # number of neighbors to check
             eta: float = .1
 
     ):

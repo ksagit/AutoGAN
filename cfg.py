@@ -21,9 +21,13 @@ def parse_args():
     parser.add_argument(
         '--alpha',
         type=float,
-        default=.1,
-        help='proportion of discriminator to get from the neighborhood discriminator'
-    )
+        default=0.1,
+        help='proportion of discriminator to get from the neighborhood discriminator')
+    parser.add_argument(
+        '--K',
+        type=float,
+        default=1,
+        help='Lipschitz constant of neighbor discriminator')
     parser.add_argument(
         '--max_epoch',
         type=int,

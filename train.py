@@ -88,7 +88,7 @@ def main():
     gen_net.apply(weights_init)
     dis_net.apply(weights_init)
 
-    dis_net_neighbor = NeighborDiscriminator(X=rip_cifar10_whole_tensor()).cuda()
+    dis_net_neighbor = NeighborDiscriminator(X=rip_cifar10_whole_tensor(), K=args.K).cuda()
 
     # set optimizer
     gen_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, gen_net.parameters()),
@@ -168,7 +168,7 @@ def main():
         train(args, gen_net, dis_net, dis_net_neighbor, gen_optimizer, dis_optimizer, dis_neighbor_optimizer, gen_avg_param, train_loader, epoch, writer_dict,
               lr_schedulers)
 
-        if True:  # epoch and epoch % args.val_freq == 0 or epoch == int(args.max_epoch)-1:
+        if epoch and epoch % args.val_freq == 0 or epoch == int(args.max_epoch)-1:
             backup_param = copy_params(gen_net)
             load_params(gen_net, gen_avg_param)
             inception_score, fid_score = validate(args, fixed_z, fid_stat, gen_net, writer_dict)
