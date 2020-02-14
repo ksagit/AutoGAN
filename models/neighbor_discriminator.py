@@ -69,6 +69,7 @@ class NeighborDiscriminator(nn.Module):
         super(NeighborDiscriminator, self).__init__()
         self.X = X.view(X.shape[0], -1)
         self.w = nn.Parameter(torch.zeros(X.shape[0], 1))
+        self.bn = nn.BatchNorm1d(num_features=1)
 
         nn.init.xavier_uniform(self.w.data, 1.)
 
@@ -173,13 +174,18 @@ class NeighborDiscriminator(nn.Module):
         distances = torch.norm(differences, dim=2)
 
         dists = self.get_maximal_neighbor_activations(distances, maximal_neighbor_activation_indices)
-        return torch.sigmoid(dists)
+
+        with torch.no_grad():
+            mu = torch.mean(dists)
+
+        sig_dists = (dists - mu)
+        return sig_dists
 
 
     def project_weights(self):
         with torch.no_grad():
             self.w -= self.w.mean()
-            self.update_index()
+
 
 class QuantizedNeighborDiscriminator(NeighborDiscriminator):
     """Doesn't work very well..."""

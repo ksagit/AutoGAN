@@ -140,10 +140,13 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_op
         dis_optimizer.zero_grad()
 
         real_validity = dis_net(real_imgs)
+        real_validity_neighbor = dis_net_neighbor(real_imgs)
         fake_imgs = gen_net(z).detach()
         assert fake_imgs.size() == real_imgs.size()
 
         fake_validity = dis_net(fake_imgs)
+        fake_validity_neighbor = dis_net_neighbor(fake_imgs)
+        d_loss_neighbor = torch.mean(fake_validity_neighbor)
         # print(fake_imgs.shape)
         # print(fake_imgs.shape)
 
@@ -153,25 +156,38 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_op
         d_loss.backward()
         dis_optimizer.step()
 
+        print(fake_validity[:10], fake_validity_neighbor[:10])
+        print()
+        print(real_validity[:10], real_validity_neighbor[:10])
+        print()
+        print()
+        print()
+
+        d_loss_neighbor.backward()
+        dis_neighbor_optimizer.step()
+        dis_net_neighbor.project_weights()
+        dis_net_neighbor.update_index()
+
         writer.add_scalar('d_loss', d_loss.item(), global_steps)
 
         # -----------------
         #  Train Generator
         # -----------------
-        if global_steps % 500 == 0:
-            with torch.no_grad():
-                dis_net_neighbor.update_index()
-                num_chunks = 500
-                chunk_size = len(dis_net_neighbor.X) // num_chunks
-                new_w = torch.zeros_like(dis_net_neighbor.w)
-                for chunk_idx in range(num_chunks):
-                    chunk_start, chunk_end = chunk_size * chunk_idx, chunk_size * (chunk_idx + 1)
-
-                    x = dis_net_neighbor.X[chunk_start: chunk_end].view(-1, 3, 32, 32)
-
-                    new_w[chunk_start: chunk_end] = dis_net(x)
-                    assert (new_w.shape == dis_net_neighbor.w.shape)
-                dis_net_neighbor.w.data = new_w
+        if global_steps % 10 == 0:
+            pass
+            #
+            # with torch.no_grad():
+            #     num_chunks = 500
+            #     chunk_size = len(dis_net_neighbor.X) // num_chunks
+            #     new_w = torch.zeros_like(dis_net_neighbor.w)
+            #     for chunk_idx in range(num_chunks):
+            #         chunk_start, chunk_end = chunk_size * chunk_idx, chunk_size * (chunk_idx + 1)
+            #
+            #         x = dis_net_neighbor.X[chunk_start: chunk_end].view(-1, 3, 32, 32)
+            #
+            #         new_w[chunk_start: chunk_end] = dis_net(x)
+            #         assert (new_w.shape == dis_net_neighbor.w.shape)
+            #     dis_net_neighbor.w.data = new_w
 
         if global_steps % args.n_critic == 0:
             gen_optimizer.zero_grad()
@@ -179,7 +195,27 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_op
             gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.gen_batch_size, args.latent_dim)))
             gen_imgs = gen_net(gen_z)
             spread = stdev(gen_imgs.view(gen_imgs.shape[0], -1))
-            fake_validity = args.alpha * dis_net_neighbor(gen_imgs) + (1 - args.alpha) * dis_net(gen_imgs)
+
+            fake_validity_vanilla = dis_net(gen_imgs)
+            fake_validity_neighbor = dis_net_neighbor(gen_imgs).unsqueeze(1)
+
+            with torch.no_grad():
+                sigma_vanilla = torch.std(fake_validity_vanilla)
+                sigma_neighbor = torch.std(fake_validity_neighbor)
+
+            fake_validity_neighbor *= sigma_vanilla / sigma_neighbor
+
+            # assert(fake_validity_neighbor.dim() == 1)
+            # assert(fake_validity_vanilla.dim() == 1)
+
+            corr = np.corrcoef(
+                fake_validity_neighbor.squeeze(1).cpu().data.numpy(),
+                fake_validity_vanilla.squeeze(1).cpu().data.numpy()
+            )
+            corr = corr[0][1]
+
+
+            fake_validity = args.alpha * fake_validity_neighbor + (1 - args.alpha) * fake_validity_vanilla
             # fake_validity = dis_net(gen_imgs)
 
             # cal loss
@@ -205,10 +241,10 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_op
             gen_step += 1
 
         # verbose
-        if gen_step and iter_idx % args.print_freq == 0:
+        if gen_step and iter_idx % 10 == 0:
             tqdm.write(
-                "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f] [Spread: %f]" %
-                (epoch, args.max_epoch, iter_idx % len(train_loader), len(train_loader), d_loss.item(), g_loss.item(), spread))
+                "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f] [Spread: %f] [Correlation: %f]" %
+                (epoch, args.max_epoch, iter_idx % len(train_loader), len(train_loader), d_loss.item(), g_loss.item(), spread, corr))
 
         writer_dict['train_global_steps'] = global_steps + 1
 
@@ -322,21 +358,17 @@ def validate(args, fixed_z, fid_stat, gen_net: nn.Module, writer_dict, clean_dir
             imsave(file_name, img)
         img_list.extend(list(gen_imgs))
 
-    # get inception score
     logger.info('=> calculate inception score')
     for _ in range(10):
         try:
             mean, std = get_inception_score(img_list)
+            print(f"Inception score: {mean}")
+            logger.info('=> calculate fid score')
+            fid_score = calculate_fid_given_paths([fid_buffer_dir, fid_stat], inception_path=None)
+            print(f"FID score: {fid_score}")
             break
         except:
             pass
-
-    print(f"Inception score: {mean}")
-
-    # get fid score
-    logger.info('=> calculate fid score')
-    fid_score = calculate_fid_given_paths([fid_buffer_dir, fid_stat], inception_path=None)
-    print(f"FID score: {fid_score}")
 
     if clean_dir:
         os.system('rm -r {}'.format(fid_buffer_dir))
