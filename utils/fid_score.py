@@ -315,7 +315,7 @@ def calculate_fid_given_paths(paths, inception_path, low_profile=False):
             raise RuntimeError("Invalid path: %s" % p)
 
     config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
+    config.gpu_options.per_process_gpu_memory_fraction = 0.2
     with tf.Session(config=config) as sess:
         sess.run(tf.global_variables_initializer())
         m1, s1 = _handle_path(paths[0], sess, low_profile=low_profile)

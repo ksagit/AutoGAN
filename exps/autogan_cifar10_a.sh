@@ -3,8 +3,8 @@
 python train.py \
 -gen_bs 128 \
 -dis_bs 64 \
---alpha 0 \
---K 1 \
+--alpha 1 \
+--K 750 \
 --dataset cifar10 \
 --bottom_width 4 \
 --img_size 32 \
@@ -22,5 +22,5 @@ python train.py \
 --beta2 0.9 \
 --init_type xavier_uniform \
 --n_critic 5 \
---val_freq 1 \
+--val_freq 5 \
 --exp_name autogan_cifar10_a

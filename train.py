@@ -95,7 +95,7 @@ def main():
                                      args.g_lr, (args.beta1, args.beta2))
     dis_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, dis_net.parameters()),
                                      args.d_lr, (args.beta1, args.beta2))
-    dis_neighbor_optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, dis_net.parameters()), 10)
+    dis_neighbor_optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, dis_net_neighbor.parameters()), 0)
     gen_scheduler = LinearLrDecay(gen_optimizer, args.g_lr, 0.0, 0, args.max_iter * args.n_critic)
     dis_scheduler = LinearLrDecay(dis_optimizer, args.d_lr, 0.0, 0, args.max_iter * args.n_critic)
 
@@ -168,7 +168,7 @@ def main():
         train(args, gen_net, dis_net, dis_net_neighbor, gen_optimizer, dis_optimizer, dis_neighbor_optimizer, gen_avg_param, train_loader, epoch, writer_dict,
               lr_schedulers)
 
-        if epoch % args.val_freq == 0 or epoch == int(args.max_epoch)-1:
+        if True: #  epoch and epoch % args.val_freq == 0 or epoch == int(args.max_epoch)-1:
             backup_param = copy_params(gen_net)
             load_params(gen_net, gen_avg_param)
             inception_score, fid_score = validate(args, fixed_z, fid_stat, gen_net, writer_dict)

@@ -21,37 +21,30 @@ def swig_ptr_from_LongTensor(x):
     return faiss.cast_integer_to_long_ptr(x.storage().data_ptr())
 
 
-class NeighborDiscriminatorFunction(Function):
+class CustomBatchNorm(nn.Module):
 
-    @staticmethod
-    def forward(ctx, input, model):
-        D, I = model.get_approximated_neighbor_activations(input)
-        D_actual, I_actual = model.get_actual_distances(D, I)
-        D, I = model.get_maximal_neighbor_activations(D_actual, I_actual)
+    def __init__(self, momentum=.9):
+        super().__init__()
+        self.running_mean = 0
+        self.running_variance = 1
+        self.eps = 2e-5
+        self.momentum = momentum
 
-        neighbors = model.X[I].cuda()
-        D_actual_at_maxes_mask = torch.cat(
-            [
-                (I_actual[:, col] == I).unsqueeze(1)
-                for col in range(I_actual.shape[1])
-            ], dim=1
-        )
-        D_actual_at_maxes = D_actual.masked_select(D_actual_at_maxes_mask)
-        scaled_stabilized_D_actual_at_maxes = D_actual_at_maxes / model.K + 1e-5
-        ctx.save_for_backward(input, neighbors, scaled_stabilized_D_actual_at_maxes)
-        return D, I
+    def forward(self, x, importance=1):
+        assert (x.dim() == 2 and x.shape[1] == 1)
+        assert (0. <= importance <= 1)
 
-    @staticmethod
-    def backward(ctx, grad_output, _grad_indices):
+        # update statistics
+        update_size = (1 - self.momentum) * importance
 
-        input, neighbors, scaled_D_actual = ctx.saved_tensors
-        return (neighbors - input) / scaled_D_actual.unsqueeze(1), None
+        batch_mean = torch.mean(x).detach()
+        batch_variance = torch.var(x).detach()
 
-class DummyDistanceFunction(Function):
+        self.running_mean = (1 - update_size) * self.running_mean + update_size * batch_mean
+        self.running_variance = (1 - update_size) * self.running_variance + update_size * batch_variance
 
-    @staticmethod
-    def forward(ctx, distance_hints):
-        pass
+        # normalize and return x
+        return (x - self.running_mean) / (self.running_variance + self.eps).sqrt()
 
 
 class NeighborDiscriminator(nn.Module):
@@ -59,7 +52,7 @@ class NeighborDiscriminator(nn.Module):
     def __init__(
             self,
             X: torch.Tensor,
-            K: float = 1,
+            K: float = 750,
             nlist: int = 100,
             nprobe: int = 10,
             k: int = 256,  # number of neighbors to check
@@ -79,6 +72,7 @@ class NeighborDiscriminator(nn.Module):
         self.nlist = nlist
         self.nprobe = nprobe
         self.k = k
+        self.bn = CustomBatchNorm()
 
         self.eta = eta
 
@@ -161,10 +155,10 @@ class NeighborDiscriminator(nn.Module):
 
         maximal_neighbor_activations = neighbor_activations.gather(1, neighbor_activation_argmaxes)
         # maximal_neighbor_activations = torch.sum(neighbor_activations, dim=1, keepdim=True)
-        return maximal_neighbor_activations.squeeze(1)
+        return maximal_neighbor_activations
     
 
-    def forward(self, X_tilde):
+    def forward(self, X_tilde, bn_importance = 1.0):
         X_tilde = X_tilde.view(X_tilde.shape[0], -1)
         with torch.no_grad():
             _, maximal_neighbor_activation_indices = self.get_approximated_neighbor_activations(X_tilde)
@@ -174,17 +168,14 @@ class NeighborDiscriminator(nn.Module):
         distances = torch.norm(differences, dim=2)
 
         dists = self.get_maximal_neighbor_activations(distances, maximal_neighbor_activation_indices)
-
-        with torch.no_grad():
-            mu = torch.mean(dists)
-
-        sig_dists = (dists - mu)
-        return sig_dists
+        # return self.bn(dists, bn_importance)
+        return dists
 
 
     def project_weights(self):
         with torch.no_grad():
             self.w -= self.w.mean()
+
 
 
 class QuantizedNeighborDiscriminator(NeighborDiscriminator):
