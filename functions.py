@@ -180,44 +180,54 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_op
         if global_steps % args.n_critic == 0:
             dis_net_neighbor.w.data[:] = 0
             for _qux in range(0):
+                dis_neighbor_optimizer.zero_grad()
                 z = torch.cuda.FloatTensor(np.random.normal(0, 1, (1, args.latent_dim)))
                 fake_imgs = gen_net(z).detach()
 
                 fake_validity_neighbor = dis_net_neighbor(fake_imgs, bn_importance=1.0)
                 d_loss_neighbor = torch.mean(fake_validity_neighbor)
                 d_loss_neighbor.backward()
+                dis_neighbor_optimizer.step()
+
 
             dis_net_neighbor.update_index()
-            dis_net_neighbor.project_weights()
 
             gen_optimizer.zero_grad()
 
             gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.gen_batch_size, args.latent_dim)))
             gen_imgs = gen_net(gen_z)
             spread = stdev(gen_imgs.view(gen_imgs.shape[0], -1))
-
-            fake_validity_vanilla = dis_net(gen_imgs)
+            #
+            # fake_validity_vanilla = dis_net(gen_imgs)
             fake_validity_neighbor = dis_net_neighbor(gen_imgs, bn_importance=1.0)
-
-            # assert(fake_validity_neighbor.dim() == 1)
-            # assert(fake_validity_vanilla.dim() == 1)
-
-            a = fake_validity_neighbor.squeeze(1).cpu().data.numpy()
-            b = fake_validity_vanilla.squeeze(1).cpu().data.numpy()
-            corr = np.corrcoef(
-                a,
-                b
-            )
-            corr = corr[0][1]
-
-            assert(fake_validity_vanilla.shape == fake_validity_neighbor.shape)
-            fake_validity = args.alpha * fake_validity_neighbor + (1 - args.alpha) * fake_validity_vanilla
-            # fake_validity = dis_net(gen_imgs)
-
-            # cal loss
+            #
+            # # assert(fake_validity_neighbor.dim() == 1)
+            # # assert(fake_validity_vanilla.dim() == 1)
+            #
+            # a = fake_validity_neighbor.squeeze(1).cpu().data.numpy()
+            # b = fake_validity_vanilla.squeeze(1).cpu().data.numpy()
+            # corr = np.corrcoef(
+            #     a,
+            #     b
+            # )
+            # corr = corr[0][1]
+            #
+            # assert(fake_validity_vanilla.shape == fake_validity_neighbor.shape)
+            fake_validity = args.alpha * fake_validity_neighbor  # + (1 - args.alpha) * fake_validity_vanilla
+            # # fake_validity = dis_net(gen_imgs)
+            #
+            # # cal loss
+            #
             g_loss = -torch.mean(fake_validity)
-            g_loss.backward()
+            # g_loss.backward()
+
+            print(gen_imgs.grad)
+
             gen_optimizer.step()
+
+            g_loss = torch.randn(1)
+            # spread = 0
+            corr = 0
 
             # adjust learning rate
             if schedulers:
