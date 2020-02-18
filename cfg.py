@@ -24,6 +24,11 @@ def parse_args():
         default=0.1,
         help='proportion of discriminator to get from the neighborhood discriminator')
     parser.add_argument(
+        '--d_neighbor_lr',
+        type=float,
+        default=1.0,
+        help='proportion of discriminator to get from the neighborhood discriminator')
+    parser.add_argument(
         '--K',
         type=float,
         default=1,

@@ -188,9 +188,9 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_op
                 d_loss_neighbor = torch.sum(fake_validity_neighbor)
                 d_loss_neighbor.backward()
                 dis_neighbor_optimizer.step()
+                dis_net_neighbor.project_weights()
+                dis_net_neighbor.update_index()
 
-            dis_net_neighbor.project_weights()
-            dis_net_neighbor.update_index()
             gen_optimizer.zero_grad()
 
             gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.gen_batch_size, args.latent_dim)))
