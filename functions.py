@@ -179,13 +179,13 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_op
 
         if global_steps % args.n_critic == 0:
             dis_net_neighbor.w.data[:] = 0
-            for _qux in range(10):
+            for _qux in range(20):
                 dis_neighbor_optimizer.zero_grad()
                 z = torch.cuda.FloatTensor(np.random.normal(0, 1, (32, args.latent_dim)))
                 fake_imgs = gen_net(z).detach()
 
                 fake_validity_neighbor = dis_net_neighbor(fake_imgs, bn_importance=1.0)
-                d_loss_neighbor = torch.mean(fake_validity_neighbor)
+                d_loss_neighbor = torch.sum(fake_validity_neighbor)
                 d_loss_neighbor.backward()
                 dis_neighbor_optimizer.step()
 
