@@ -179,9 +179,9 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_op
 
         if global_steps % args.n_critic == 0:
             dis_net_neighbor.w.data[:] = 0
-            for _qux in range(0):
+            for _qux in range(10):
                 dis_neighbor_optimizer.zero_grad()
-                z = torch.cuda.FloatTensor(np.random.normal(0, 1, (1, args.latent_dim)))
+                z = torch.cuda.FloatTensor(np.random.normal(0, 1, (32, args.latent_dim)))
                 fake_imgs = gen_net(z).detach()
 
                 fake_validity_neighbor = dis_net_neighbor(fake_imgs, bn_importance=1.0)
@@ -189,45 +189,51 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_op
                 d_loss_neighbor.backward()
                 dis_neighbor_optimizer.step()
 
-
+            dis_net_neighbor.project_weights()
             dis_net_neighbor.update_index()
-
             gen_optimizer.zero_grad()
 
             gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.gen_batch_size, args.latent_dim)))
             gen_imgs = gen_net(gen_z)
             spread = stdev(gen_imgs.view(gen_imgs.shape[0], -1))
             #
-            # fake_validity_vanilla = dis_net(gen_imgs)
+            fake_validity_vanilla = dis_net(gen_imgs)
             fake_validity_neighbor = dis_net_neighbor(gen_imgs, bn_importance=1.0)
-            #
-            # # assert(fake_validity_neighbor.dim() == 1)
-            # # assert(fake_validity_vanilla.dim() == 1)
-            #
-            # a = fake_validity_neighbor.squeeze(1).cpu().data.numpy()
-            # b = fake_validity_vanilla.squeeze(1).cpu().data.numpy()
-            # corr = np.corrcoef(
-            #     a,
-            #     b
-            # )
-            # corr = corr[0][1]
-            #
-            # assert(fake_validity_vanilla.shape == fake_validity_neighbor.shape)
-            fake_validity = args.alpha * fake_validity_neighbor  # + (1 - args.alpha) * fake_validity_vanilla
+
+            # assert(fake_validity_neighbor.dim() == 1)
+            # assert(fake_validity_vanilla.dim() == 1)
+
+            a = fake_validity_neighbor.squeeze(1).cpu().data.numpy()
+            b = fake_validity_vanilla.squeeze(1).cpu().data.numpy()
+            corr = np.corrcoef(
+                a,
+                b
+            )
+            corr = corr[0][1]
+
+            assert(fake_validity_vanilla.shape == fake_validity_neighbor.shape)
+            fake_validity = args.alpha * fake_validity_neighbor + (1 - args.alpha) * fake_validity_vanilla
             # # fake_validity = dis_net(gen_imgs)
             #
             # # cal loss
             #
             g_loss = -torch.mean(fake_validity)
-            # g_loss.backward()
-
-            print(gen_imgs.grad)
+            g_loss.backward()
 
             gen_optimizer.step()
 
-            g_loss = torch.randn(1)
+            # g_loss = torch.randn(1)
             # spread = 0
-            corr = 0
+            # corr = 0
+
+
+            ###
+            # gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (1, args.latent_dim)))
+            # gen_img = gen_net(gen_z)
+            # norms = torch.sum((dis_net_neighbor.X - gen_img.view(1, -1))**2, axis=1)
+            # print(gen_img)
+            # neighbor = dis_net_neighbor.X[torch.argmin(norms)]
+            # print(neighbor.view(*gen_img.shape))
 
             # adjust learning rate
             if schedulers:
@@ -241,13 +247,13 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_op
 
             # moving average weight
             for p, avg_p in zip(gen_net.parameters(), gen_avg_param):
-                avg_p.mul_(0.999).add_(0.001, p.data)
+                avg_p.mul_(0.999).add_(.001, p.data)
 
             writer.add_scalar('g_loss', g_loss.item(), global_steps)
             gen_step += 1
 
         # verbose
-        if gen_step and iter_idx % 10 == 0:
+        if gen_step and iter_idx % args.print_freq == 0:
             tqdm.write(
                 "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f] [Spread: %f] [Correlation: %f]" %
                 (epoch, args.max_epoch, iter_idx % len(train_loader), len(train_loader), d_loss.item(), g_loss.item(), spread, corr))

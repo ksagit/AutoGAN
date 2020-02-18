@@ -3,7 +3,7 @@
 python train.py \
 -gen_bs 128 \
 -dis_bs 64 \
---alpha .5 \
+--alpha 1 \
 --K 750 \
 --dataset cifar10 \
 --bottom_width 4 \

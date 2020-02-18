@@ -168,8 +168,8 @@ class NeighborDiscriminator(nn.Module):
         distances = torch.norm(differences, dim=2)
 
         dists = self.get_maximal_neighbor_activations(distances, maximal_neighbor_activation_indices)
-        # return self.bn(dists, bn_importance)
-        return dists
+        return self.bn(dists, bn_importance)
+        # return dists
 
 
     def project_weights(self):
