@@ -64,6 +64,7 @@ class RetardedNeighborDiscriminator(nn.Module):
         self.X = X.view(X.shape[0], -1)
         self.w = nn.Parameter(torch.zeros(X.shape[0], 1))
         self.K = K
+        self.bn = CustomBatchNorm()
 
     def forward(self, X_tilde):
         X_tilde = X_tilde.view(X_tilde.shape[0], -1)
@@ -73,9 +74,11 @@ class RetardedNeighborDiscriminator(nn.Module):
         exact_maximal_neighbor_activations, _ = torch.max(exact_neighbor_activations, axis=0)
 
         ret = exact_maximal_neighbor_activations.unsqueeze(1)
+        standardized_ret = self.bn(ret)
+
         assert(ret.shape[1] == 1)
         assert(ret.dim() == 2)
-        return ret
+        return ret, standardized_ret
 
 class NeighborDiscriminator(nn.Module):
 

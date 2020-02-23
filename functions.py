@@ -203,7 +203,7 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_op
                 z = torch.cuda.FloatTensor(np.random.normal(0, 1, (128, args.latent_dim)))
                 fake_imgs = gen_net(z).detach()
 
-                fake_validity_neighbor = dis_net_neighbor(fake_imgs)
+                fake_validity_neighbor, _ = dis_net_neighbor(fake_imgs)
                 # fake_validity_neighbor_clipped = F.relu(args.hinge + fake_validity_neighbor)
 
                 d_loss_neighbor = torch.mean(fake_validity_neighbor)
@@ -237,7 +237,7 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_op
             spread = stdev(gen_imgs.view(gen_imgs.shape[0], -1))
             #
             fake_validity_vanilla = dis_net(gen_imgs)
-            fake_validity_neighbor = dis_net_neighbor(gen_imgs)
+            _, fake_validity_neighbor = dis_net_neighbor(gen_imgs)
 
             # assert(fake_validity_neighbor.dim() == 1)
             # assert(fake_validity_vanilla.dim() == 1)

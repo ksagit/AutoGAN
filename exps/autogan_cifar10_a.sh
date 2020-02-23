@@ -4,7 +4,7 @@ python train.py \
 -gen_bs 128 \
 -dis_bs 64 \
 --alpha 1 \
---K 750 \
+--K 1 \
 --hinge 1e5 \
 --dataset cifar10 \
 --bottom_width 4 \
