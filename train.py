@@ -30,7 +30,7 @@ torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = True
 
 
-from models.neighbor_discriminator import NeighborDiscriminator
+from models.neighbor_discriminator import NeighborDiscriminator, RetardedNeighborDiscriminator
 import torchvision.transforms as transforms
 import torchvision.datasets as torch_datasets
 
@@ -53,7 +53,7 @@ def rip_cifar10_whole_tensor():
         num_workers=0, pin_memory=False
     )
     for imgs, _labels in train:
-        return imgs.cuda()[100: 110]
+        return imgs.cuda()
 
 
 def main():
@@ -88,7 +88,7 @@ def main():
     gen_net.apply(weights_init)
     dis_net.apply(weights_init)
 
-    dis_net_neighbor = NeighborDiscriminator(X=rip_cifar10_whole_tensor(), K=args.K).cuda()
+    dis_net_neighbor = RetardedNeighborDiscriminator(X=rip_cifar10_whole_tensor(), K=args.K).cuda()
 
     # set optimizer
     gen_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, gen_net.parameters()),
@@ -165,10 +165,13 @@ def main():
     # train loop
     for epoch in tqdm(range(int(start_epoch), int(args.max_epoch)), desc='total progress'):
         lr_schedulers = (gen_scheduler, dis_scheduler) if args.lr_decay else None
+
+        # dis_net_neighbor.alloc_index()
         train(args, gen_net, dis_net, dis_net_neighbor, gen_optimizer, dis_optimizer, dis_neighbor_optimizer, gen_avg_param, train_loader, epoch, writer_dict,
               lr_schedulers)
+        # dis_net_neighbor.free_index()
 
-        if epoch == 1 or (epoch != 0 and epoch % args.val_freq == 0) or epoch == int(args.max_epoch)-1:
+        if epoch == 0 or (epoch != 0 and epoch % args.val_freq == 0) or epoch == int(args.max_epoch)-1:
             backup_param = copy_params(gen_net)
             load_params(gen_net, gen_avg_param)
             inception_score, fid_score = validate(args, fixed_z, fid_stat, gen_net, writer_dict)

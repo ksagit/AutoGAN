@@ -46,6 +46,36 @@ class CustomBatchNorm(nn.Module):
         # normalize and return x
         return (x - self.running_mean) / (self.running_variance + self.eps).sqrt()
 
+def torch_pairwise_distances(X, Y):
+    return torch.sqrt(torch.abs(
+        torch.sum(X * X, dim=1, keepdim=True)
+        - 2 * torch.matmul(X, Y.transpose(0,1))
+        + torch.sum(Y * Y, dim=1, keepdim=True).transpose(0,1)
+    ))
+
+class RetardedNeighborDiscriminator(nn.Module):
+
+    def __init__(
+        self,
+        X,
+        K
+    ):
+        super().__init__()
+        self.X = X.view(X.shape[0], -1)
+        self.w = nn.Parameter(torch.zeros(X.shape[0], 1))
+        self.K = K
+
+    def forward(self, X_tilde):
+        X_tilde = X_tilde.view(X_tilde.shape[0], -1)
+
+        pairwise_distances = torch_pairwise_distances(self.X, X_tilde)
+        exact_neighbor_activations = -self.K * pairwise_distances + self.w
+        exact_maximal_neighbor_activations, _ = torch.max(exact_neighbor_activations, axis=0)
+
+        ret = exact_maximal_neighbor_activations.unsqueeze(1)
+        assert(ret.shape[1] == 1)
+        assert(ret.dim() == 2)
+        return ret
 
 class NeighborDiscriminator(nn.Module):
 
@@ -55,7 +85,7 @@ class NeighborDiscriminator(nn.Module):
             K: float = 750,
             nlist: int = 100,
             nprobe: int = 10,
-            k: int = 256,  # number of neighbors to check
+            k: int = 16,  # number of neighbors to check
             eta: float = .1
 
     ):
@@ -80,7 +110,7 @@ class NeighborDiscriminator(nn.Module):
 
     def get_w_prime(self):
         w_prime = -(self.w - torch.max(self.w))
-        w_prime = torch.sqrt(w_prime / self.K)
+        w_prime = w_prime / self.K
         return w_prime.cuda()
 
     def get_X_w(self):
@@ -165,16 +195,16 @@ class NeighborDiscriminator(nn.Module):
 
         neighbor_vectors = self.X[maximal_neighbor_activation_indices]  # batchsize x k x img size
         differences = (neighbor_vectors - X_tilde.unsqueeze(1))  # batchsize x k x img size - batchsize x 1 x img size
-        distances = torch.norm(differences, dim=2)
+        distances = torch.norm(differences, dim=2, p=1)
 
         dists = self.get_maximal_neighbor_activations(distances, maximal_neighbor_activation_indices)
-        return self.bn(dists, bn_importance)
-        # return dists
+        # return self.bn(dists, bn_importance)
+        return dists
 
 
     def project_weights(self):
         with torch.no_grad():
-            self.w -= self.w.mean()
+            self.w -= self.w.max()
 
 
 

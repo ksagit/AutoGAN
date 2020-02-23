@@ -8,6 +8,8 @@ import logging
 import operator
 import os
 from copy import deepcopy
+import pdb
+import torch.nn.functional as F
 
 import numpy as np
 import torch
@@ -116,81 +118,118 @@ def train_shared(args, gen_net: nn.Module, dis_net: nn.Module, g_loss_history, d
     return dynamic_reset
 
 
+class BufferQueue:
+    def __init__(self, size):
+        self.size = size
+        self.buffer = []
+    def push(self, elt):
+        self.buffer = [elt] + self.buffer[0: self.size - 1]
+
+
 def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_optimizer, dis_optimizer, dis_neighbor_optimizer, gen_avg_param, train_loader,
           epoch, writer_dict, schedulers=None):
     writer = writer_dict['writer']
     gen_step = 0
+    corr = None
 
     # train mode
     gen_net = gen_net.train()
     dis_net = dis_net.train()
 
     for iter_idx, (imgs, _) in enumerate(tqdm(train_loader)):
-        global_steps = writer_dict['train_global_steps']
+        try:
+            global_steps = writer_dict['train_global_steps']
+            # if corr is not None and corr < -.8:
+            # if iter_idx == 40:
+            #     pdb.set_trace()
 
-        # Adversarial ground truths
-        real_imgs = imgs.type(torch.cuda.FloatTensor)
+            # Adversarial ground truths
+            ###
+            # real_imgs = imgs.type(torch.cuda.FloatTensor)
+            #
+            # # Sample noise as generator input
+            # z = torch.cuda.FloatTensor(np.random.normal(0, 1, (imgs.shape[0], args.latent_dim)))
+            #
+            # # ---------------------
+            # #  Train Discriminator
+            # # ---------------------
+            # dis_optimizer.zero_grad()
+            #
+            # real_validity = dis_net(real_imgs)
+            # fake_imgs = gen_net(z).detach()
+            # assert fake_imgs.size() == real_imgs.size()
+            #
+            # fake_validity = dis_net(fake_imgs)
+            # # print(fake_imgs.shape)
+            # # print(fake_imgs.shape)
+            #
+            # # cal loss
+            # d_loss = torch.mean(nn.ReLU(inplace=True)(1.0 - real_validity)) + \
+            #          torch.mean(nn.ReLU(inplace=True)(1 + fake_validity))
+            # d_loss.backward()
+            # dis_optimizer.step()
+            ###
+            d_loss = torch.randn(1)
 
-        # Sample noise as generator input
-        z = torch.cuda.FloatTensor(np.random.normal(0, 1, (imgs.shape[0], args.latent_dim)))
+            # print(fake_validity[:10], fake_validity_neighbor[:10])
+            # print()
+            # print(real_validity[:10], real_validity_neighbor[:10])
+            # print()
+            # print()
+            # print()
 
-        # ---------------------
-        #  Train Discriminator
-        # ---------------------
-        dis_optimizer.zero_grad()
+            # fake_imgs.requires_grad = True
 
-        real_validity = dis_net(real_imgs)
-        fake_imgs = gen_net(z).detach()
-        assert fake_imgs.size() == real_imgs.size()
+            # print("\n\n\n\n\n\n")
+            # print(dis_net_neighbor.w)
+            # print(dis_net_neighbor.w.mean())
+            # print(dis_net_neighbor.w.grad)
+            # print(dis_net_neighbor.w)
+            # print(dis_net_neighbor.w.mean())
 
-        fake_validity = dis_net(fake_imgs)
-        # print(fake_imgs.shape)
-        # print(fake_imgs.shape)
+            # dis_net_neighbor.update_index()
 
-        # cal loss
-        d_loss = torch.mean(nn.ReLU(inplace=True)(1.0 - real_validity)) + \
-                 torch.mean(nn.ReLU(inplace=True)(1 + fake_validity))
-        d_loss.backward()
-        dis_optimizer.step()
+            writer.add_scalar('d_loss', d_loss.item(), global_steps)
+            prev_d_loss_neighbor_item = None
+            patience = 0
 
-        # print(fake_validity[:10], fake_validity_neighbor[:10])
-        # print()
-        # print(real_validity[:10], real_validity_neighbor[:10])
-        # print()
-        # print()
-        # print()
+            lq = BufferQueue(size=3)
+            patience = 0
 
-        # fake_imgs.requires_grad = True
-
-        # print("\n\n\n\n\n\n")
-        # print(dis_net_neighbor.w)
-        # print(dis_net_neighbor.w.mean())
-        # print(dis_net_neighbor.w.grad)
-        # print(dis_net_neighbor.w)
-        # print(dis_net_neighbor.w.mean())
-
-        # dis_net_neighbor.update_index()
-
-        writer.add_scalar('d_loss', d_loss.item(), global_steps)
-
-        # -----------------
-        #  Train Generator
-        # -----------------
-
-        if global_steps % args.n_critic == 0:
-            dis_net_neighbor.w.data[:] = 0
-            for _qux in range(20):
+            # Train to optimality
+            idx = 0
+            while True:
                 dis_neighbor_optimizer.zero_grad()
-                z = torch.cuda.FloatTensor(np.random.normal(0, 1, (32, args.latent_dim)))
+                z = torch.cuda.FloatTensor(np.random.normal(0, 1, (128, args.latent_dim)))
                 fake_imgs = gen_net(z).detach()
 
-                fake_validity_neighbor = dis_net_neighbor(fake_imgs, bn_importance=1.0)
-                d_loss_neighbor = torch.sum(fake_validity_neighbor)
-                d_loss_neighbor.backward()
-                dis_neighbor_optimizer.step()
-                dis_net_neighbor.project_weights()
-                dis_net_neighbor.update_index()
+                fake_validity_neighbor = dis_net_neighbor(fake_imgs)
+                # fake_validity_neighbor_clipped = F.relu(args.hinge + fake_validity_neighbor)
 
+                d_loss_neighbor = torch.mean(fake_validity_neighbor)
+                d_loss_neighbor.backward()
+
+                dis_neighbor_optimizer.step()
+                dis_net_neighbor.w.data -= torch.mean(dis_net_neighbor.w.data)
+
+                d_loss_neighbor_item = d_loss_neighbor.item()
+                # idx += 1
+                # if idx > 5:
+                #     break
+
+                print(d_loss_neighbor_item)
+                if len(lq.buffer) == lq.size:
+                    if d_loss_neighbor_item < np.min(lq.buffer):
+                        patience = 0
+                    elif patience < 1:
+                        patience += 1
+                    else:
+                        break
+
+                lq.push(d_loss_neighbor_item)
+
+
+            # dis_net_neighbor.w.data[:] = 0
             gen_optimizer.zero_grad()
 
             gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.gen_batch_size, args.latent_dim)))
@@ -198,7 +237,7 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_op
             spread = stdev(gen_imgs.view(gen_imgs.shape[0], -1))
             #
             fake_validity_vanilla = dis_net(gen_imgs)
-            fake_validity_neighbor = dis_net_neighbor(gen_imgs, bn_importance=1.0)
+            fake_validity_neighbor = dis_net_neighbor(gen_imgs)
 
             # assert(fake_validity_neighbor.dim() == 1)
             # assert(fake_validity_vanilla.dim() == 1)
@@ -217,25 +256,29 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_op
             #
             # # cal loss
             #
+
+            # print(torch.mean(fake_validity_vanilla))
+            # print(torch.mean(fake_validity_neighbor))
+
             g_loss = -torch.mean(fake_validity)
             g_loss.backward()
 
             gen_optimizer.step()
 
-            # g_loss = torch.randn(1)
-            # spread = 0
-            # corr = 0
+                # g_loss = torch.randn(1)
+                # spread = 0
+                # corr = 0
 
 
-            ###
-            # gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (1, args.latent_dim)))
-            # gen_img = gen_net(gen_z)
-            # norms = torch.sum((dis_net_neighbor.X - gen_img.view(1, -1))**2, axis=1)
-            # print(gen_img)
-            # neighbor = dis_net_neighbor.X[torch.argmin(norms)]
-            # print(neighbor.view(*gen_img.shape))
+                ###
+                # gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (1, args.latent_dim)))
+                # gen_img = gen_net(gen_z)
+                # norms = torch.sum((dis_net_neighbor.X - gen_img.view(1, -1))**2, axis=1)
+                # print(gen_img)
+                # neighbor = dis_net_neighbor.X[torch.argmin(norms)]
+                # print(neighbor.view(*gen_img.shape))
 
-            # adjust learning rate
+                # adjust learning rate
             if schedulers:
                 print("foo bar baz")
 
@@ -252,13 +295,15 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_op
             writer.add_scalar('g_loss', g_loss.item(), global_steps)
             gen_step += 1
 
-        # verbose
-        if gen_step and iter_idx % args.print_freq == 0:
-            tqdm.write(
-                "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f] [Spread: %f] [Correlation: %f]" %
-                (epoch, args.max_epoch, iter_idx % len(train_loader), len(train_loader), d_loss.item(), g_loss.item(), spread, corr))
+            # verbose
+            if gen_step and iter_idx % args.print_freq == 0:
+                tqdm.write(
+                    "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f] [Spread: %f] [Correlation: %f]" %
+                    (epoch, args.max_epoch, iter_idx % len(train_loader), len(train_loader), d_loss.item(), g_loss.item(), spread, corr))
 
-        writer_dict['train_global_steps'] = global_steps + 1
+            writer_dict['train_global_steps'] = global_steps + 1
+        except KeyboardInterrupt:
+            pdb.set_trace()
 
 
 def train_controller(args, controller, ctrl_optimizer, gen_net, prev_hiddens, prev_archs, writer_dict):

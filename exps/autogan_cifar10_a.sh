@@ -3,12 +3,13 @@
 python train.py \
 -gen_bs 128 \
 -dis_bs 64 \
---alpha .5 \
---K 1 \
+--alpha 1 \
+--K 750 \
+--hinge 1e5 \
 --dataset cifar10 \
 --bottom_width 4 \
 --img_size 32 \
---max_iter 50000 \
+--max_iter 400000 \
 --gen_model autogan_cifar10_a \
 --dis_model autogan_cifar10_a \
 --latent_dim 128 \
@@ -18,10 +19,11 @@ python train.py \
 --d_spectral_norm True \
 --g_lr 0.0002 \
 --d_lr 0.0002 \
---d_neighbor_lr 1.0 \
+--d_neighbor_lr 1e3 \
 --beta1 0.0 \
 --beta2 0.9 \
 --init_type xavier_uniform \
 --n_critic 5 \
---val_freq 20 \
---exp_name autogan_cifar10_a
+--val_freq 5 \
+--exp_name autogan_cifar10_a \
+--print_freq 10
