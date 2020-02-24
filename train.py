@@ -30,7 +30,7 @@ torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = True
 
 
-from models.neighbor_discriminator import NeighborDiscriminator, RetardedNeighborDiscriminator
+from models.neighbor_discriminator import NeighborDiscriminator, SimpleNeighborDiscriminator
 import torchvision.transforms as transforms
 import torchvision.datasets as torch_datasets
 
@@ -88,7 +88,7 @@ def main():
     gen_net.apply(weights_init)
     dis_net.apply(weights_init)
 
-    dis_net_neighbor = RetardedNeighborDiscriminator(X=rip_cifar10_whole_tensor(), K=args.K).cuda()
+    dis_net_neighbor = SimpleNeighborDiscriminator(X=rip_cifar10_whole_tensor(), K=args.K).cuda()
 
     # set optimizer
     gen_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, gen_net.parameters()),

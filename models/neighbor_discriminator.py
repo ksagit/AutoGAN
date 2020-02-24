@@ -53,7 +53,7 @@ def torch_pairwise_distances(X, Y):
         + torch.sum(Y * Y, dim=1, keepdim=True).transpose(0,1)
     ))
 
-class RetardedNeighborDiscriminator(nn.Module):
+class SimpleNeighborDiscriminator(nn.Module):
 
     def __init__(
         self,
@@ -78,7 +78,7 @@ class RetardedNeighborDiscriminator(nn.Module):
 
         assert(ret.shape[1] == 1)
         assert(ret.dim() == 2)
-        return ret, standardized_ret
+        return ret  # , standardized_ret
 
 class NeighborDiscriminator(nn.Module):
 
@@ -198,7 +198,7 @@ class NeighborDiscriminator(nn.Module):
 
         neighbor_vectors = self.X[maximal_neighbor_activation_indices]  # batchsize x k x img size
         differences = (neighbor_vectors - X_tilde.unsqueeze(1))  # batchsize x k x img size - batchsize x 1 x img size
-        distances = torch.norm(differences, dim=2, p=1)
+        distances = torch.norm(differences, dim=2, p=2)
 
         dists = self.get_maximal_neighbor_activations(distances, maximal_neighbor_activation_indices)
         # return self.bn(dists, bn_importance)

@@ -1,5 +1,5 @@
 import unittest
-from models.neighbor_discriminator import NeighborDiscriminator
+from models.neighbor_discriminator import NeighborDiscriminator, SimpleNeighborDiscriminator
 import torch
 from torch.autograd import grad
 
@@ -19,13 +19,14 @@ class TestNeighborDiscriminator(unittest.TestCase):
         self.x_gen = torch.randn(128, 3 * 32 * 32).cuda()
         self.x_gen.requires_grad = True
         self.dis = NeighborDiscriminator(self.X, k=20, K=1).cuda()
+        self.simple_dis = SimpleNeighborDiscriminator(self.X, K=1).cuda()
         self.dis.w.data = torch.randn_like(self.dis.w.data) / 10
         self.dis.update_index()
 
 
     def test_neighbor_activation_correctness(self):
         """For the baseline (exact) NeighborDiscriminator, we should have exact matches"""
-        maximal_neighbor_activations = self.dis(self.x_gen)
+        maximal_neighbor_activations = self.dis(self.x_gen).squeeze(1)
 
         pairwise_distances = torch_pairwise_distances(self.X, self.x_gen)
         exact_neighbor_activations = -self.dis.K * pairwise_distances + self.dis.w.data
@@ -45,7 +46,7 @@ class TestNeighborDiscriminator(unittest.TestCase):
             Where i is the index of the maximal neighbor activation.
         """
         # Get the gradient from the model
-        d_gen = self.dis(self.x_gen)
+        d_gen = self.dis(self.x_gen).squeeze(1)
         loss_gen = torch.sum(d_gen)
 
         grad_model = grad(outputs=loss_gen, inputs=self.x_gen)
