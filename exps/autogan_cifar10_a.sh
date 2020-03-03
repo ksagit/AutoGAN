@@ -17,9 +17,9 @@ python train.py \
 --df_dim 128 \
 --g_spectral_norm False \
 --d_spectral_norm True \
---g_lr 0.0002 \
+--g_lr 0.000002 \
 --d_lr 0.0002 \
---d_neighbor_lr 1e3 \
+--d_neighbor_lr .02 \
 --beta1 0.0 \
 --beta2 0.9 \
 --init_type xavier_uniform \

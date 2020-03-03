@@ -78,7 +78,7 @@ class SimpleNeighborDiscriminator(nn.Module):
 
         assert(ret.shape[1] == 1)
         assert(ret.dim() == 2)
-        return ret  # , standardized_ret
+        return ret, standardized_ret
 
 class NeighborDiscriminator(nn.Module):
 
