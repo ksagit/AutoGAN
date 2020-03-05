@@ -19,25 +19,10 @@ def str2bool(v):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--alpha',
-        type=float,
-        default=0.1,
-        help='proportion of discriminator to get from the neighborhood discriminator')
-    parser.add_argument(
-        '--d_neighbor_lr',
-        type=float,
-        default=1.0,
-        help='proportion of discriminator to get from the neighborhood discriminator')
-    parser.add_argument(
         '--K',
         type=float,
         default=1,
         help='Lipschitz constant of neighbor discriminator')
-    parser.add_argument(
-        '--hinge',
-        type=float,
-        default=1,
-        help='hinge threshold below which not to give the discriminator updates')
     parser.add_argument(
         '--max_epoch',
         type=int,
@@ -52,13 +37,13 @@ def parse_args():
         '-gen_bs',
         '--gen_batch_size',
         type=int,
-        default=64,
+        default=1024,
         help='size of the batches')
     parser.add_argument(
         '-dis_bs',
         '--dis_batch_size',
         type=int,
-        default=64,
+        default=1024,
         help='size of the batches')
     parser.add_argument(
         '--g_lr',

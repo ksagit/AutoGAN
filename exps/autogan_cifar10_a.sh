@@ -3,9 +3,7 @@
 python train.py \
 -gen_bs 128 \
 -dis_bs 64 \
---alpha 1 \
---K 1 \
---hinge 1e5 \
+--K 750 \
 --dataset cifar10 \
 --bottom_width 4 \
 --img_size 32 \
@@ -15,11 +13,10 @@ python train.py \
 --latent_dim 128 \
 --gf_dim 256 \
 --df_dim 128 \
---g_spectral_norm False \
+--g_spectral_norm True \
 --d_spectral_norm True \
---g_lr 0.000002 \
---d_lr 0.0002 \
---d_neighbor_lr .02 \
+--g_lr 0.0002 \
+--d_lr 1e5 \
 --beta1 0.0 \
 --beta2 0.9 \
 --init_type xavier_uniform \
