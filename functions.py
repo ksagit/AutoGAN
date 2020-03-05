@@ -203,7 +203,9 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor: Neighb
             g_loss.backward()
             gen_optimizer.step()
 
-            mode_captures = dis_net_neighbor.get_num_mode_captures(gen_imgs)
+            mode_captures = dis_net_neighbor.get_mode_captures(gen_imgs)
+            print(mode_captures)
+            num_mode_captures = len(mode_captures)
 
             if schedulers:
                 print("foo bar baz")
@@ -225,7 +227,7 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor: Neighb
             if gen_step and iter_idx % args.print_freq == 0:
                 tqdm.write(
                     "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f] [Spread: %f] [Mode Captures: %f]" %
-                    (epoch, args.max_epoch, iter_idx % len(train_loader), len(train_loader), 0, g_loss.item(), spread, mode_captures))
+                    (epoch, args.max_epoch, iter_idx % len(train_loader), len(train_loader), 0, g_loss.item(), spread, num_mode_captures))
 
             writer_dict['train_global_steps'] = global_steps + 1
         except KeyboardInterrupt:

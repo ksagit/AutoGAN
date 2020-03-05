@@ -66,14 +66,14 @@ class SimpleNeighborDiscriminator(nn.Module):
         self.K = K
         self.bn = CustomBatchNorm()
 
-    def get_num_mode_captures(self, X_tilde):
+    def get_mode_captures(self, X_tilde):
         X_tilde = X_tilde.view(X_tilde.shape[0], -1)
 
         _, minimal_distance_indices = torch.min(torch_pairwise_distances(self.X, X_tilde), axis=0)
         mode_indices = minimal_distance_indices.tolist()
 
         # return mode_indices
-        return len(set(mode_indices))
+        return set(mode_indices)
 
 
     def forward(self, X_tilde):
