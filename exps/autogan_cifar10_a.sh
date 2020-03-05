@@ -16,7 +16,7 @@ python train.py \
 --g_spectral_norm True \
 --d_spectral_norm True \
 --g_lr 0.0002 \
---d_lr 1e5 \
+--d_lr 1e3 \
 --beta1 0.0 \
 --beta2 0.9 \
 --init_type xavier_uniform \

@@ -167,7 +167,7 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor: Neighb
                 d_loss_neighbor.backward()
 
                 dis_neighbor_optimizer.step()
-                dis_net_neighbor.w.data -= torch.mean(dis_net_neighbor.w.data)
+                dis_net_neighbor.w.data -= torch.max(dis_net_neighbor.w.data)
 
                 d_loss_neighbor_item = d_loss_neighbor.item()
 
