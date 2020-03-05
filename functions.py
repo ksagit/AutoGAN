@@ -126,7 +126,10 @@ class BufferQueue:
         self.buffer = [elt] + self.buffer[0: self.size - 1]
 
 
-def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_optimizer, dis_optimizer, dis_neighbor_optimizer, gen_avg_param, train_loader,
+from models.neighbor_discriminator import NeighborDiscriminator
+
+
+def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor: NeighborDiscriminator, gen_optimizer, dis_optimizer, dis_neighbor_optimizer, gen_avg_param, train_loader,
           epoch, writer_dict, schedulers=None):
     writer = writer_dict['writer']
     gen_step = 0
@@ -200,7 +203,7 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor, gen_op
             g_loss.backward()
             gen_optimizer.step()
 
-            mode_captures = dis_net_neighbor.get_mode_captures(gen_imgs)
+            mode_captures = dis_net_neighbor.get_num_mode_captures(gen_imgs)
 
             if schedulers:
                 print("foo bar baz")
