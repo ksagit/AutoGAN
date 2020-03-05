@@ -3,7 +3,7 @@
 python train.py \
 -gen_bs 128 \
 -dis_bs 64 \
---K 750 \
+--K .1 \
 --dataset cifar10 \
 --bottom_width 4 \
 --img_size 32 \
@@ -16,7 +16,7 @@ python train.py \
 --g_spectral_norm True \
 --d_spectral_norm True \
 --g_lr 0.0002 \
---d_lr 1e3 \
+--d_lr 1 \
 --beta1 0.0 \
 --beta2 0.9 \
 --init_type xavier_uniform \

@@ -134,7 +134,6 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor: Neighb
     writer = writer_dict['writer']
     gen_step = 0
     corr = 0
-    eta = .0001
 
     # train mode
     gen_net = gen_net.train()
@@ -167,7 +166,7 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor: Neighb
                 d_loss_neighbor.backward()
 
                 dis_neighbor_optimizer.step()
-                dis_net_neighbor.w.data -= torch.max(dis_net_neighbor.w.data)
+                dis_net_neighbor.w.data -= torch.mean(dis_net_neighbor.w.data)
 
                 d_loss_neighbor_item = d_loss_neighbor.item()
 
@@ -197,7 +196,8 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor: Neighb
             gen_imgs = gen_net(gen_z)
             spread = stdev(gen_imgs.view(gen_imgs.shape[0], -1))
             #
-            fake_validity = eta * dis_net_neighbor(gen_imgs)
+            fake_validity = dis_net_neighbor(gen_imgs)
+            print(fake_validity)
 
             g_loss = -torch.mean(fake_validity)
             g_loss.backward()
