@@ -166,22 +166,24 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor: Neighb
                 d_loss_neighbor.backward()
 
                 dis_neighbor_optimizer.step()
-                dis_net_neighbor.w.data -= torch.mean(dis_net_neighbor.w.data)
+                dis_net_neighbor.w.data -= torch.max(dis_net_neighbor.w.data)
 
                 d_loss_neighbor_item = d_loss_neighbor.item()
-
-                # idx += 1
-                # if idx > 1:
+                # if iter_idx % 10 != 0:
                 #     break
-                #
+
+                idx += 1
+                if idx > 1:
+                    break
+
                 # print(d_loss_neighbor_item)
-                if len(lq.buffer) == lq.size:
-                    if d_loss_neighbor_item < np.min(lq.buffer):
-                        patience = 0
-                    elif patience < max_patience:
-                        patience += 1
-                    else:
-                        break
+                # if len(lq.buffer) == lq.size:
+                #     if d_loss_neighbor_item < np.min(lq.buffer):
+                #         patience = 0
+                #     elif patience < max_patience:
+                #         patience += 1
+                #     else:
+                #         break
 
                 lq.push(d_loss_neighbor_item)
             
@@ -197,14 +199,14 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, dis_net_neighbor: Neighb
             spread = stdev(gen_imgs.view(gen_imgs.shape[0], -1))
             #
             fake_validity = dis_net_neighbor(gen_imgs)
-            print(fake_validity)
+            # print(fake_validity)
 
             g_loss = -torch.mean(fake_validity)
             g_loss.backward()
             gen_optimizer.step()
 
             mode_captures = dis_net_neighbor.get_mode_captures(gen_imgs)
-            print(mode_captures)
+            # print(sorted(mode_captures))
             num_mode_captures = len(mode_captures)
 
             if schedulers:
@@ -349,7 +351,7 @@ def validate(args, fixed_z, fid_stat, gen_net: nn.Module, writer_dict, clean_dir
             mean, std = get_inception_score(img_list)
             print(f"Inception score: {mean}")
             logger.info('=> calculate fid score')
-            fid_score = calculate_fid_given_paths([fid_buffer_dir, fid_stat], inception_path=None)
+            fid_score = mean  # calculate_fid_given_paths([fid_buffer_dir, fid_stat], inception_path=None)
             print(f"FID score: {fid_score}")
             break
         except Exception as e:
