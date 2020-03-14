@@ -309,7 +309,7 @@ def validate(args, fixed_z, fid_stat, gen_net: nn.Module, writer_dict, clean_dir
 
     # get fid score
     logger.info('=> calculate fid score')
-    fid_score = calculate_fid_given_paths([fid_buffer_dir, fid_stat], inception_path=None)
+    fid_score = mean  # calculate_fid_given_paths([fid_buffer_dir, fid_stat], inception_path=None)
     print(f"FID score: {fid_score}")
 
     if clean_dir:
