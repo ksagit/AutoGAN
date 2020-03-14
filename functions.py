@@ -162,7 +162,7 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
             gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.gen_batch_size, args.latent_dim)))
             gen_imgs = gen_net(gen_z)
             spread = stdev(gen_imgs.view(gen_imgs.shape[0], -1))
-            fake_validity = dis_net(gen_imgs)
+            fake_validity = 7000 * dis_net(gen_imgs) + 6000
 
             # cal loss
             g_loss = -torch.mean(fake_validity)
