@@ -26,7 +26,7 @@ from copy import deepcopy
 import subprocess
 
 
-torch.backends.cudnn.enabled = True
+torch.backends.cudnn.enabled = Truedqqdddd
 torch.backends.cudnn.benchmark = True
 
 
