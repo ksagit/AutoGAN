@@ -115,21 +115,32 @@ def train_shared(args, gen_net: nn.Module, dis_net: nn.Module, g_loss_history, d
 
     return dynamic_reset
 
+from ncsn.models.cond_refinenet_dilated import CondRefineNetDilated
+from ncsn.runners.anneal_runner import update_score
 
-def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optimizer, gen_avg_param, train_loader,
+SIGMAS = torch.tensor(
+    np.exp(np.linspace(np.log(1.0), np.log(.01),
+    10))).float().cuda()
+
+def train(args, gen_net: nn.Module, score_p_d: CondRefineNetDilated, score_p_m: CondRefineNetDilated, gen_optimizer, score_p_m_optimizer, gen_avg_param, train_loader,
           epoch, writer_dict, schedulers=None):
     writer = writer_dict['writer']
     gen_step = 0
 
     # train mode
     gen_net = gen_net.train()
-    dis_net = dis_net.train()
+    print("score mixture model checksum", sum(param.sum().item() for param in score_p_m.parameters()))
+
+    losses = []
 
     for iter_idx, (imgs, _) in enumerate(tqdm(train_loader)):
         global_steps = writer_dict['train_global_steps']
 
+        score_p_m.train()
+
         # Adversarial ground truths
         real_imgs = imgs.type(torch.cuda.FloatTensor)
+        # real_imgs.requires_grad = True
 
         # Sample noise as generator input
         z = torch.cuda.FloatTensor(np.random.normal(0, 1, (imgs.shape[0], args.latent_dim)))
@@ -137,35 +148,46 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
         # ---------------------
         #  Train Discriminator
         # ---------------------
-        dis_optimizer.zero_grad()
+        score_p_m_optimizer.zero_grad()
 
-        real_validity = dis_net(real_imgs)
         fake_imgs = gen_net(z).detach()
-        assert fake_imgs.size() == real_imgs.size()
+        imgs = torch.cat([fake_imgs], dim=0)
 
-        fake_validity = dis_net(fake_imgs)
+        scaled_imgs = imgs / 2 + 1
 
-        # cal loss
-        d_loss = torch.mean(nn.ReLU(inplace=True)(1.0 - real_validity)) + \
-                 torch.mean(nn.ReLU(inplace=True)(1 + fake_validity))
-        d_loss.backward()
-        dis_optimizer.step()
+        d_loss = update_score(
+            score=score_p_m,
+            optimizer=score_p_m_optimizer,
+            X=scaled_imgs,
+            sigmas=SIGMAS,
+            anneal_power=2.0
+        )
+        if iter_idx % 10 == 0:
+            print("\n", d_loss.item())
 
         writer.add_scalar('d_loss', d_loss.item(), global_steps)
-
+        losses.append(d_loss.item())
         # -----------------
         #  Train Generator
         # -----------------
-        if global_steps % args.n_critic == 0:
+        # Don't start training the generator til score_p_m has a good sense of the initial distribution
+        if global_steps % args.n_critic == 0 and epoch >= 10:
+            raise
+
+            score_p_m.eval()
+            score_p_d.eval()
+
             gen_optimizer.zero_grad()
 
             gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.gen_batch_size, args.latent_dim)))
             gen_imgs = gen_net(gen_z)
             spread = stdev(gen_imgs.view(gen_imgs.shape[0], -1))
-            fake_validity = dis_net(gen_imgs)
+
+            scaled_gen_imgs = gen_imgs / 2 + 1
+
+            score_p_m
 
             # cal loss
-            g_loss = -torch.mean(fake_validity)
             g_loss.backward()
             gen_optimizer.step()
 
@@ -191,7 +213,7 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
                 (epoch, args.max_epoch, iter_idx % len(train_loader), len(train_loader), d_loss.item(), g_loss.item(), spread))
 
         writer_dict['train_global_steps'] = global_steps + 1
-
+    print("mean loss:", np.mean(losses))
 
 def train_controller(args, controller, ctrl_optimizer, gen_net, prev_hiddens, prev_archs, writer_dict):
     logger.info("=> train controller...")

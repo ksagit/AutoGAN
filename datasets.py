@@ -17,6 +17,7 @@ class ImageDataset(object):
             Dt = datasets.CIFAR10
             transform = transforms.Compose([
                 transforms.Resize(img_size),
+                transforms.RandomHorizontalFlip(p=0.5),
                 transforms.ToTensor(),
                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
             ])

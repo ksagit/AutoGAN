@@ -2,9 +2,6 @@ imageio
 scipy
 six
 numpy
-torchvision
 Pillow==6.1
 python-dateutil==2.7.3
-tensorboard==1.12.2
-tensorboardX==1.6
 tqdm==4.29.1
