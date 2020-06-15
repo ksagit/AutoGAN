@@ -122,10 +122,20 @@ SIGMAS = torch.tensor(
     np.exp(np.linspace(np.log(1.0), np.log(.01),
     10))).float().cuda()
 
+def get_eval_sigma(epoch: int, max_epoch: int):
+    # The idea is that we don't spend a lot of time in the lower sigmas (0, 1, ... etc.) and ramp up to sigma 7, 8, 9
+    # relatively quickly so that we aren't feeding our generator garbage gradients when we can be reasonably sure it's
+    # close to the actual data distribution
+    return epoch ** .5 * 10 // max_epoch ** .5
+
+
 def train(args, gen_net: nn.Module, score_p_d: CondRefineNetDilated, score_p_m: CondRefineNetDilated, gen_optimizer, score_p_m_optimizer, gen_avg_param, train_loader,
           epoch, writer_dict, schedulers=None):
     writer = writer_dict['writer']
     gen_step = 0
+
+    # Use this sigma during evaluation
+    eval_sigma = get_eval_sigma(epoch, args.max_epoch)
 
     # train mode
     gen_net = gen_net.train()
@@ -134,6 +144,9 @@ def train(args, gen_net: nn.Module, score_p_d: CondRefineNetDilated, score_p_m: 
     losses = []
 
     for iter_idx, (imgs, _) in enumerate(tqdm(train_loader)):
+        if iter_idx > 2:
+            break
+
         global_steps = writer_dict['train_global_steps']
 
         score_p_m.train()
@@ -151,7 +164,7 @@ def train(args, gen_net: nn.Module, score_p_d: CondRefineNetDilated, score_p_m: 
         score_p_m_optimizer.zero_grad()
 
         fake_imgs = gen_net(z).detach()
-        imgs = torch.cat([fake_imgs], dim=0)
+        imgs = torch.cat([real_imgs, fake_imgs], dim=0)
 
         scaled_imgs = imgs / 2 + 1
 
@@ -162,8 +175,6 @@ def train(args, gen_net: nn.Module, score_p_d: CondRefineNetDilated, score_p_m: 
             sigmas=SIGMAS,
             anneal_power=2.0
         )
-        if iter_idx % 10 == 0:
-            print("\n", d_loss.item())
 
         writer.add_scalar('d_loss', d_loss.item(), global_steps)
         losses.append(d_loss.item())
@@ -171,24 +182,24 @@ def train(args, gen_net: nn.Module, score_p_d: CondRefineNetDilated, score_p_m: 
         #  Train Generator
         # -----------------
         # Don't start training the generator til score_p_m has a good sense of the initial distribution
-        if global_steps % args.n_critic == 0 and epoch >= 10:
-            raise
-
+        if global_steps % args.n_critic == 0 and epoch >= 0:
             score_p_m.eval()
             score_p_d.eval()
-
-            gen_optimizer.zero_grad()
 
             gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.gen_batch_size, args.latent_dim)))
             gen_imgs = gen_net(gen_z)
             spread = stdev(gen_imgs.view(gen_imgs.shape[0], -1))
 
             scaled_gen_imgs = gen_imgs / 2 + 1
+            batch_sigmas = eval_sigma * torch.ones(scaled_gen_imgs.shape[0], dtype=torch.long).cuda()
 
-            score_p_m
+            with torch.no_grad():
+                grad_p_d = score_p_d(scaled_gen_imgs, batch_sigmas)
+                grad_p_m = score_p_m(scaled_gen_imgs, batch_sigmas)
 
             # cal loss
-            g_loss.backward()
+            gen_optimizer.zero_grad()
+            scaled_gen_imgs.backward(-(grad_p_d - grad_p_m))
             gen_optimizer.step()
 
             # adjust learning rate
@@ -203,14 +214,14 @@ def train(args, gen_net: nn.Module, score_p_d: CondRefineNetDilated, score_p_m: 
             for p, avg_p in zip(gen_net.parameters(), gen_avg_param):
                 avg_p.mul_(0.999).add_(0.001, p.data)
 
-            writer.add_scalar('g_loss', g_loss.item(), global_steps)
+            # writer.add_scalar('g_loss', g_loss.item(), global_steps)
             gen_step += 1
 
         # verbose
         if gen_step and iter_idx % args.print_freq == 0:
             tqdm.write(
-                "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f] [Spread: %f]" %
-                (epoch, args.max_epoch, iter_idx % len(train_loader), len(train_loader), d_loss.item(), g_loss.item(), spread))
+                "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [Spread: %f]" %
+                (epoch, args.max_epoch, iter_idx % len(train_loader), len(train_loader), d_loss.item(), spread))
 
         writer_dict['train_global_steps'] = global_steps + 1
     print("mean loss:", np.mean(losses))
@@ -295,6 +306,8 @@ def get_is(args, gen_net: nn.Module, num_img):
 
     return mean
 
+from multiprocessing import Pool
+import pdb
 
 def validate(args, fixed_z, fid_stat, gen_net: nn.Module, writer_dict, clean_dir=True):
     writer = writer_dict['writer']
@@ -326,6 +339,9 @@ def validate(args, fixed_z, fid_stat, gen_net: nn.Module, writer_dict, clean_dir
 
     # get inception score
     logger.info('=> calculate inception score')
+
+    # with Pool(1) as p:
+    #     mean, std = p.apply(get_inception_score, (img_list,))
     mean, std = get_inception_score(img_list)
     print(f"Inception score: {mean}")
 

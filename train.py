@@ -35,11 +35,13 @@ from torch.nn import DataParallel
 import torch
 
 
-def get_ncsn_model():
+def get_ncsn_model(use_checkpoint):
     state_dict = torch.load('checkpoint.pth')[0]
     config = yaml.load(open('config.yml'))
     model = DataParallel(CondRefineNetDilated(config))
-    # model.load_state_dict(state_dict)
+
+    if use_checkpoint:
+        model.load_state_dict(state_dict)
     return model.module.train().cuda()
 
 
@@ -47,18 +49,13 @@ def main():
     args = cfg.parse_args()
     torch.cuda.manual_seed(args.random_seed)
 
-    # set tf env
-    _init_inception()
-    inception_path = check_or_download_inception(None)
-    create_inception_graph(inception_path)
-
     # import network
     gen_net = eval('models.'+args.gen_model+'.Generator')(args=args).cuda()
     # dis_net = eval('models.'+args.dis_model+'.Discriminator')(args=args).cuda()
 
     # Get score models for data and mixture distributions
-    score_p_d = get_ncsn_model()
-    score_p_m = get_ncsn_model()
+    score_p_d = get_ncsn_model(use_checkpoint=True)
+    score_p_m = get_ncsn_model(use_checkpoint=False)
 
     # weight init
     def weights_init(m):
@@ -165,8 +162,8 @@ def main():
             backup_param = copy_params(gen_net)
             load_params(gen_net, gen_avg_param)
 
-            # inception_score, fid_score = validate(args, fixed_z, fid_stat, gen_net, writer_dict)
-            inception_score, fid_score = 0, 0
+            inception_score, fid_score = validate(args, fixed_z, fid_stat, gen_net, writer_dict)
+            # inception_score, fid_score = 0, 0
 
             torch.cuda.empty_cache()
             logger.info(f'Inception score: {inception_score}, FID score: {fid_score} || @ epoch {epoch}.')
