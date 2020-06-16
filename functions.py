@@ -16,7 +16,6 @@ from imageio import imsave
 from torchvision.utils import make_grid
 from tqdm import tqdm
 
-from utils.fid_score import calculate_fid_given_paths
 from utils.inception_score import get_inception_score
 
 logger = logging.getLogger(__name__)
@@ -118,9 +117,6 @@ def train_shared(args, gen_net: nn.Module, dis_net: nn.Module, g_loss_history, d
 from ncsn.models.cond_refinenet_dilated import CondRefineNetDilated
 from ncsn.runners.anneal_runner import update_score
 
-SIGMAS = torch.tensor(
-    np.exp(np.linspace(np.log(1.0), np.log(.01),
-    10))).float().cuda()
 
 def get_eval_sigma(epoch: int, max_epoch: int):
     # The idea is that we don't spend a lot of time in the lower sigmas (0, 1, ... etc.) and ramp up to sigma 7, 8, 9
@@ -135,17 +131,16 @@ def train(args, gen_net: nn.Module, score_p_d: CondRefineNetDilated, score_p_m: 
     gen_step = 0
 
     # Use this sigma during evaluation
+    sigmas = torch.tensor(np.exp(np.linspace(np.log(1.0), np.log(.01), 10))).float().cuda()
     eval_sigma = get_eval_sigma(epoch, args.max_epoch)
 
     # train mode
     gen_net = gen_net.train()
-    print("score mixture model checksum", sum(param.sum().item() for param in score_p_m.parameters()))
+    # print("Score mixture model checksum", sum(param.sum().item() for param in score_p_m.parameters()))
 
     losses = []
 
     for iter_idx, (imgs, _) in enumerate(tqdm(train_loader)):
-        if iter_idx > 2:
-            break
 
         global_steps = writer_dict['train_global_steps']
 
@@ -172,7 +167,7 @@ def train(args, gen_net: nn.Module, score_p_d: CondRefineNetDilated, score_p_m: 
             score=score_p_m,
             optimizer=score_p_m_optimizer,
             X=scaled_imgs,
-            sigmas=SIGMAS,
+            sigmas=sigmas,
             anneal_power=2.0
         )
 
@@ -224,7 +219,7 @@ def train(args, gen_net: nn.Module, score_p_d: CondRefineNetDilated, score_p_m: 
                 (epoch, args.max_epoch, iter_idx % len(train_loader), len(train_loader), d_loss.item(), spread))
 
         writer_dict['train_global_steps'] = global_steps + 1
-    print("mean loss:", np.mean(losses))
+    print("\nMean loss:", np.mean(losses))
 
 def train_controller(args, controller, ctrl_optimizer, gen_net, prev_hiddens, prev_archs, writer_dict):
     logger.info("=> train controller...")
@@ -306,8 +301,8 @@ def get_is(args, gen_net: nn.Module, num_img):
 
     return mean
 
-from multiprocessing import Pool
-import pdb
+from multiprocessing import Process, Value
+
 
 def validate(args, fixed_z, fid_stat, gen_net: nn.Module, writer_dict, clean_dir=True):
     writer = writer_dict['writer']
@@ -340,9 +335,17 @@ def validate(args, fixed_z, fid_stat, gen_net: nn.Module, writer_dict, clean_dir
     # get inception score
     logger.info('=> calculate inception score')
 
-    # with Pool(1) as p:
-    #     mean, std = p.apply(get_inception_score, (img_list,))
-    mean, std = get_inception_score(img_list)
+    proc_mean = Value('d', 0.0)
+    proc_std = Value('d', 0.0)
+
+    proc = Process(target=get_inception_score, args=(img_list, proc_mean, proc_std))
+    proc.start()
+    proc.join()
+
+    mean = proc_mean.value
+    std = proc_std.value
+
+    # mean, std = get_inception_score(img_list)
     print(f"Inception score: {mean}")
 
     # get fid score

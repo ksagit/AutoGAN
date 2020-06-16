@@ -13,8 +13,6 @@ import models
 import datasets
 from functions import train, validate, LinearLrDecay, load_params, copy_params
 from utils.utils import set_log_dir, save_checkpoint, create_logger
-from utils.inception_score import _init_inception
-from utils.fid_score import create_inception_graph, check_or_download_inception
 
 import torch
 import os
@@ -25,7 +23,6 @@ from tqdm import tqdm
 from copy import deepcopy
 import subprocess
 
-
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = True
 
@@ -33,7 +30,7 @@ import yaml
 from ncsn.models.cond_refinenet_dilated import CondRefineNetDilated
 from torch.nn import DataParallel
 import torch
-
+from multiprocessing import set_start_method
 
 def get_ncsn_model(use_checkpoint):
     state_dict = torch.load('checkpoint.pth')[0]
@@ -192,4 +189,5 @@ def main():
 
 
 if __name__ == '__main__':
+    set_start_method('spawn')
     main()

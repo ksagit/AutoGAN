@@ -10,25 +10,32 @@ import sys
 import tarfile
 
 import numpy as np
-import tensorflow as tf
 from six.moves import urllib
 from tqdm import tqdm
 
+import warnings
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=FutureWarning)
+    import tensorflow as tf
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-MODEL_DIR = '/tmp/imagenet'
-DATA_URL = 'http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz'
-
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '9'
 
 # config.gpu_options.per_process_gpu_memory_fraction = 0.33
-
+import os
 
 # Call this function with list of images. Each of elements should be a
 # numpy array with values ranging from 0 to 255.
-def get_inception_score(images, splits=10):
+def get_inception_score(images, proc_mean, proc_std, splits=10):
+    import warnings
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=FutureWarning)
+        import tensorflow as tf
+
+    print("test 2: ", tf.test.is_gpu_available())
+    # print("test 3: ", tf.config.list_physical_devices('GPU'))
+
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
-
     softmax = _init_inception(config)
 
     assert (type(images) == list)
@@ -59,12 +66,16 @@ def get_inception_score(images, splits=10):
             scores.append(np.exp(kl))
 
         sess.close()
-    return np.mean(scores), np.std(scores)
+
+    proc_mean.value = np.mean(scores)
+    proc_std.value = np.std(scores)
 
 
 # This function is called automatically.
 def _init_inception(config):
-    global softmax
+    MODEL_DIR = '/tmp/imagenet'
+    DATA_URL = 'http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz'
+
     if not os.path.exists(MODEL_DIR):
         os.makedirs(MODEL_DIR)
     filename = DATA_URL.split('/')[-1]
